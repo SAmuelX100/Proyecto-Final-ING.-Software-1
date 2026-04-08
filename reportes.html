@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Módulo de Reportes</title>
+  <link rel="stylesheet" href="./socios.css">
+  <link rel="stylesheet" href="./prestamos.css">
+  <link rel="stylesheet" href="./reportes.css">
+</head>
+<body>
+
+  <header>
+    <h1>🏠 Sistema de Control de Cooperativas - COOPBARAHONA</h1>
+    <p>Reportes y Estadísticas</p>
+  </header>
+
+  <main>
+
+    <!-- TARJETAS DE ESTADÍSTICAS RÁPIDAS -->
+    <div class="resumen-grid" id="resumen-reportes">
+      <div class="resumen-card resumen-total">
+        <span class="resumen-label">Reportes Generados</span>
+        <span class="resumen-valor" id="res-total-gen">0</span>
+      </div>
+      <div class="resumen-card resumen-aprobados">
+        <span class="resumen-label">Exportaciones PDF</span>
+        <span class="resumen-valor" id="res-pdf-count">0</span>
+      </div>
+      <div class="resumen-card resumen-count">
+        <span class="resumen-label">Exportaciones Excel</span>
+        <span class="resumen-valor" id="res-excel-count">0</span>
+      </div>
+      <div class="resumen-card resumen-pendientes">
+        <span class="resumen-label">Último Reporte</span>
+        <span class="resumen-valor" id="res-ultimo-tipo" style="font-size: 1.1rem;">Ninguno</span>
+      </div>
+    </div>
+
+    <!-- CONFIGURACIÓN DEL REPORTE -->
+    <section class="card">
+      <h2>⚙️ Configuración de Reporte</h2>
+      <form id="form-reporte" onsubmit="generarReporte(event)">
+        <div class="form-grid">
+          <div class="campo">
+            <label for="tipo">Tipo de Reporte *</label>
+            <select id="tipo" required>
+              <option value="">-- Seleccionar tipo --</option>
+              <option value="socios">Reporte de Socios (Membresía)</option>
+              <option value="aportaciones">Reporte de Aportaciones</option>
+              <option value="prestamos">Reporte de Préstamos / Créditos</option>
+              <option value="financieros">Reporte Financiero General</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="fechaInicio">Fecha Inicio *</label>
+            <input type="date" id="fechaInicio" required>
+          </div>
+
+          <div class="campo">
+            <label for="fechaFin">Fecha Fin *</label>
+            <input type="date" id="fechaFin" required>
+          </div>
+
+          <div class="campo">
+            <label for="formato">Formato de Salida *</label>
+            <select id="formato" required>
+              <option value="pantalla">Visualizar en Pantalla</option>
+              <option value="pdf">Documento PDF (.pdf)</option>
+              <option value="excel">Hoja de Cálculo (.xlsx)</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="generadoPor">Generado Por</label>
+            <input type="text" id="generadoPor" value="Administrador" readonly>
+          </div>
+        </div>
+
+        <div class="form-acciones">
+          <button type="submit" class="btn btn-primary" id="btn-generar">📊 Generar Reporte</button>
+          <button type="button" class="btn btn-secondary" onclick="limpiarFiltros()">Limpiar Filtros</button>
+        </div>
+      </form>
+      <div id="mensaje" class="mensaje" style="display:none;"></div>
+    </section>
+
+    <!-- VISTA PREVIA DEL REPORTE -->
+    <section class="card" id="seccion-vista-previa" style="display:none;">
+      <div class="tabla-header">
+        <h2 id="titulo-vista-previa">Vista Previa del Reporte</h2>
+        <div class="acciones-reporte">
+          <button class="btn btn-pdf" onclick="exportarPDF()">📥 Exportar PDF</button>
+          <button class="btn btn-excel" onclick="exportarExcel()">📥 Exportar Excel</button>
+        </div>
+      </div>
+
+      <div class="info-reporte-box">
+        <p>Rango: <strong id="preview-rango"></strong> | Tipo: <strong id="preview-tipo"></strong></p>
+      </div>
+
+      <div class="tabla-container">
+        <table id="tabla-reporte">
+          <thead id="thead-reporte">
+            <!-- Se genera dinámicamente -->
+          </thead>
+          <tbody id="tbody-reporte">
+            <!-- Se genera dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="./reportes.js"></script>
+</body>
+</html>

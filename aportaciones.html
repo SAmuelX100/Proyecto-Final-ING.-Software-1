@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Aportaciones</title>
+  <link rel="stylesheet" href="./socios.css">
+  <link rel="stylesheet" href="./aportaciones.css">
+</head>
+<body>
+
+  <header>
+    <h1>🏠 Sistema de Control de Cooperativas - COOPBARAHONA</h1>
+    <p>Aportaciones</p>
+  </header>
+
+  <main>
+
+    <!-- TARJETAS RESUMEN -->
+    <div class="resumen-grid" id="resumen-grid" style="display:none;">
+      <div class="resumen-card resumen-total">
+        <span class="resumen-label">Total General</span>
+        <span class="resumen-valor" id="res-total">RD$ 0.00</span>
+      </div>
+      <div class="resumen-card resumen-validadas">
+        <span class="resumen-label">Validadas</span>
+        <span class="resumen-valor" id="res-validadas">0</span>
+      </div>
+      <div class="resumen-card resumen-pendientes">
+        <span class="resumen-label">Pendientes</span>
+        <span class="resumen-valor" id="res-pendientes">0</span>
+      </div>
+      <div class="resumen-card resumen-count">
+        <span class="resumen-label">Total Registros</span>
+        <span class="resumen-valor" id="res-count">0</span>
+      </div>
+    </div>
+
+    <!-- FORMULARIO -->
+    <section class="card">
+      <h2 id="form-titulo">Registrar Nueva Aportación</h2>
+
+      <form id="form-aportacion" onsubmit="guardarAportacion(event)">
+        <input type="hidden" id="aportacion-id">
+
+        <div class="form-grid">
+          <div class="campo">
+            <label for="socioId">Socio *</label>
+            <select id="socioId" required>
+              <option value="">-- Seleccionar socio --</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="monto">Monto (RD$) *</label>
+            <input type="number" id="monto" min="0.01" step="0.01" placeholder="Ej: 500.00" required>
+          </div>
+
+          <div class="campo">
+            <label for="fecha">Fecha *</label>
+            <input type="date" id="fecha" required>
+          </div>
+
+          <div class="campo">
+            <label for="tipo">Tipo</label>
+            <select id="tipo">
+              <option value="cuota_mensual">Cuota Mensual</option>
+              <option value="aportacion_extraordinaria">Aportación Extraordinaria</option>
+              <option value="ahorro">Ahorro</option>
+              <option value="prestamo">Préstamo</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="estado">Estado</label>
+            <select id="estado">
+              <option value="pendiente">Pendiente</option>
+              <option value="validada">Validada</option>
+              <option value="rechazada">Rechazada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-acciones">
+          <button type="submit" class="btn btn-primary" id="btn-guardar">
+            ✓ Registrar Aportación
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarEdicion()" id="btn-cancelar" style="display:none;">
+            ✗ Cancelar
+          </button>
+        </div>
+      </form>
+
+      <div id="mensaje" class="mensaje" style="display:none;"></div>
+    </section>
+
+    <!-- TABLA -->
+    <section class="card">
+      <div class="tabla-header">
+        <h2>Aportaciones Registradas</h2>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <select id="filtro-tipo" onchange="filtrarTabla()" class="filtro-select">
+            <option value="">Todos los tipos</option>
+            <option value="cuota_mensual">Cuota Mensual</option>
+            <option value="aportacion_extraordinaria">Aportación Extraordinaria</option>
+            <option value="ahorro">Ahorro</option>
+            <option value="prestamo">Préstamo</option>
+          </select>
+          <select id="filtro-estado" onchange="filtrarTabla()" class="filtro-select">
+            <option value="">Todos los estados</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="validada">Validada</option>
+            <option value="rechazada">Rechazada</option>
+          </select>
+          <div class="busqueda">
+            <input type="text" id="buscar" placeholder="🔍 Buscar socio..." oninput="filtrarTabla()">
+          </div>
+        </div>
+      </div>
+
+      <div class="tabla-container">
+        <table id="tabla-aportaciones">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Socio</th>
+              <th>Monto</th>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-aportaciones">
+            <tr>
+              <td colspan="7" class="cargando">Cargando aportaciones...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tabla-footer">
+        <span id="total-registros">Total: 0 registros</span>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL ELIMINAR -->
+  <div id="modal-eliminar" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>⚠ Confirmar Eliminación</h3>
+      <p>¿Estás seguro de que deseas eliminar esta aportación de <strong id="modal-nombre"></strong>?</p>
+      <p class="modal-aviso">Esta acción no se puede deshacer.</p>
+      <div class="modal-acciones">
+        <button class="btn btn-danger" onclick="confirmarEliminar()">Sí, Eliminar</button>
+        <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./aportaciones.js"></script>
+</body>
+</html>

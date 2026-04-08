@@ -1,0 +1,115 @@
+/* RESUMEN TARJETAS */
+.resumen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.resumen-card {
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.resumen-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+.resumen-valor { font-size: 1.6rem; font-weight: 700; }
+.resumen-total     { background: #ebf8ff; color: #2c5282; }
+.resumen-aprobados { background: #c6f6d5; color: #22543d; }
+.resumen-pendientes{ background: #fefcbf; color: #744210; }
+.resumen-count     { background: #e9d8fd; color: #44337a; }
+
+/* FILTROS */
+.filtro-select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: #2d3748;
+  background: #fff;
+  cursor: pointer;
+}
+.filtro-select:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+}
+
+/* BADGES ESTADO */
+.badge-solicitado  { background: #bee3f8; color: #2a4365; }
+.badge-en_revision { background: #e9d8fd; color: #44337a; }
+.badge-aprobado    { background: #c6f6d5; color: #22543d; }
+.badge-rechazado   { background: #fed7d7; color: #742a2a; }
+.badge-desembolsado{ background: #b2f5ea; color: #234e52; }
+.badge-pagado      { background: #e2e8f0; color: #4a5568; }
+
+/* BADGES CUOTA */
+.badge-pendiente { background: #fefcbf; color: #744210; }
+.badge-pagada    { background: #c6f6d5; color: #22543d; }
+.badge-vencida   { background: #fed7d7; color: #742a2a; }
+
+/* MONTOS */
+.monto       { font-weight: 700; color: #2b6cb0; }
+.monto-verde { color: #22543d; font-weight: 700; }
+.monto-rojo  { color: #742a2a; font-weight: 700; }
+
+/* BOTONES ACCIÓN */
+.btn-evaluar {
+  background: #e9d8fd; color: #44337a;
+  padding: 5px 10px; font-size: 0.78rem;
+}
+.btn-evaluar:hover { background: #9f7aea; color: white; }
+
+.btn-aprobar {
+  background: #68d391; color: #22543d;
+  padding: 5px 10px; font-size: 0.78rem;
+}
+.btn-aprobar:hover { background: #38a169; color: white; }
+
+.btn-rechazar {
+  background: #fc8181; color: #742a2a;
+  padding: 5px 10px; font-size: 0.78rem;
+}
+.btn-rechazar:hover { background: #e53e3e; color: white; }
+
+.btn-amortizacion {
+  background: #bee3f8; color: #2a4365;
+  padding: 5px 10px; font-size: 0.78rem;
+}
+.btn-amortizacion:hover { background: #4299e1; color: white; }
+
+/* CAJA DE EVALUACIÓN */
+.evaluacion-box {
+  background: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+.evaluacion-box .eval-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+.evaluacion-box .eval-item:last-child { border-bottom: none; }
+.eval-label    { color: #718096; }
+.eval-valor    { font-weight: 600; color: #2d3748; }
+.eval-aprobado { color: #22543d; font-weight: 700; }
+.eval-revisar  { color: #744210; font-weight: 700; }
+.eval-rechazar { color: #742a2a; font-weight: 700; }
+
+/* MODAL ANCHO */
+.modal-wide { max-width: 780px; }
+
+/* TABLA AMORTIZACIÓN */
+.tabla-amort th { font-size: 0.78rem; }
+.tabla-amort td { font-size: 0.83rem; }
+.cuota-pagada td { opacity: 0.55; text-decoration: line-through; }
