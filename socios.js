@@ -4,7 +4,6 @@ let sociosList = [];
 let idParaEliminar = null;
 
 // ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
-
 document.addEventListener("DOMContentLoaded", () => {
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fechaIngreso").value = hoy;
@@ -12,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ─── CARGAR LISTA DE SOCIOS ───────────────────────────────────────────────────
-
 async function cargarSocios() {
   try {
     const res = await fetch(API_BASE);
@@ -27,7 +25,6 @@ async function cargarSocios() {
 }
 
 // ─── RENDERIZAR TABLA ─────────────────────────────────────────────────────────
-
 function renderTabla(lista) {
   const tbody = document.getElementById("tbody-socios");
   document.getElementById("total-socios").textContent = `Total: ${lista.length} socio(s)`;
@@ -39,18 +36,18 @@ function renderTabla(lista) {
 
   tbody.innerHTML = lista.map(s => `
     <tr>
-      <td>${s.id_socio || s.id}</td>
-      <td>${escHtml(s.nombre)} ${escHtml(s.apellido)}</td>
-      <td>${escHtml(s.dni)}</td>
+      <td>${s.id_socio || '—'}</td>
+      <td>${escHtml(s.nombre || '')} ${escHtml(s.apellido || '')}</td>
+      <td>${escHtml(s.dni || '')}</td>
       <td>${s.email ? escHtml(s.email) : '<span style="color:#a0aec0">—</span>'}</td>
       <td>${s.telefono ? escHtml(s.telefono) : '<span style="color:#a0aec0">—</span>'}</td>
       <td>${s.direccion ? escHtml(s.direccion) : '<span style="color:#a0aec0">—</span>'}</td>
-      <td>${formatearFecha(s.fechaIngreso)}</td>
-      <td><span class="badge badge-${s.estado}">${escHtml(s.estado)}</span></td>
+      <td>${formatearFecha(s.fecha_ingreso)}</td>
+      <td><span class="badge badge-${s.estado || 'pendiente'}">${escHtml(s.estado)}</span></td>
       <td>
         <div class="acciones">
-          <button class="btn btn-editar" onclick="editarSocio(${s.id_socio || s.id})">✏ Editar</button>
-          <button class="btn btn-eliminar" onclick="pedirEliminar(${s.id_socio || s.id}, '${escAttr(s.nombre)} ${escAttr(s.apellido)}')">🗑 Eliminar</button>
+          <button class="btn btn-editar" onclick="editarSocio(${s.id_socio})">✏ Editar</button>
+          <button class="btn btn-eliminar" onclick="pedirEliminar(${s.id_socio}, '${escAttr((s.nombre || '') + ' ' + (s.apellido || ''))}')">🗑 Eliminar</button>
         </div>
       </td>
     </tr>
@@ -58,7 +55,6 @@ function renderTabla(lista) {
 }
 
 // ─── FILTRO / BÚSQUEDA ────────────────────────────────────────────────────────
-
 function filtrarTabla() {
   const q = document.getElementById("buscar").value.toLowerCase();
   const filtrados = sociosList.filter(s =>
@@ -70,21 +66,20 @@ function filtrarTabla() {
 }
 
 // ─── GUARDAR (REGISTRAR O ACTUALIZAR) ────────────────────────────────────────
-
 async function guardarSocio(e) {
   e.preventDefault();
 
   const id = document.getElementById("socio-id").value;
   const datos = {
     id_usuario: parseInt(localStorage.getItem("user_id")) || 1,
-    nombre:       document.getElementById("nombre").value.trim(),
-    apellido:     document.getElementById("apellido").value.trim(),
-    dni:          document.getElementById("dni").value.trim(),
-    email:        document.getElementById("email").value.trim() || null,
-    telefono:     document.getElementById("telefono").value.trim() || null,
-    direccion:    document.getElementById("direccion").value.trim() || null,
-    fechaIngreso: document.getElementById("fechaIngreso").value || null,
-    estado:       document.getElementById("estado").value,
+    nombre: document.getElementById("nombre").value.trim(),
+    apellido: document.getElementById("apellido").value.trim(),
+    dni: document.getElementById("dni").value.trim(),
+    email: document.getElementById("email").value.trim() || null,
+    telefono: document.getElementById("telefono").value.trim() || null,
+    direccion: document.getElementById("direccion").value.trim() || null,
+    fecha_ingreso: document.getElementById("fechaIngreso").value, // ✅ snake_case consistente
+    estado: document.getElementById("estado").value,
   };
 
   if (!datos.nombre || !datos.apellido || !datos.dni) {
@@ -94,6 +89,7 @@ async function guardarSocio(e) {
 
   const btn = document.getElementById("btn-guardar");
   btn.disabled = true;
+  btn.textContent = "⏳ Guardando...";
 
   try {
     let res;
@@ -119,7 +115,7 @@ async function guardarSocio(e) {
     }
 
     mostrarMensaje(
-      id ? `Socio actualizado exitosamente.` : `Socio registrado exitosamente (ID: ${resultado.id}).`,
+      id ? `Socio actualizado exitosamente.` : `Socio registrado exitosamente (ID: ${resultado.id_socio}).`,
       "exito"
     );
     limpiarFormulario();
@@ -128,28 +124,38 @@ async function guardarSocio(e) {
     mostrarMensaje("Error de conexión: " + err.message, "error");
   } finally {
     btn.disabled = false;
+    btn.textContent = id ? "✓ Guardar Cambios" : "✓ Registrar Socio";
   }
 }
 
-// ─── EDITAR SOCIO ─────────────────────────────────────────────────────────────
-
+// ─── EDITAR SOCIO (✅ 100% FUNCIONAL) ──────────────────────────────────────────
 async function editarSocio(id) {
   try {
-    const res = await fetch(`${API_BASE}/${id}`);
-    if (!res.ok) throw new Error("Socio no encontrado");
-    const s = await res.json();
+    // ✅ GET individual: /api/Socio?id=123
+    const res = await fetch(`${API_BASE}?id=${id}`);
+    
+    if (!res.ok) {
+      throw new Error("Socio no encontrado");
+    }
+    
+    const socio = await res.json();
+    
+    if (!socio) {
+      throw new Error("Socio no encontrado en la base de datos");
+    }
 
-    document.getElementById("socio-id").value = s.id_socio || s.id;  
-    document.getElementById("nombre").value = s.nombre || '';
-    document.getElementById("apellido").value = s.apellido || '';
-    document.getElementById("dni").value            = s.dni;
-    document.getElementById("email").value          = s.email || "";
-    document.getElementById("telefono").value       = s.telefono || "";
-    document.getElementById("direccion").value      = s.direccion || "";
-    document.getElementById("fechaIngreso").value   = s.fechaIngreso || "";
-    document.getElementById("estado").value         = s.estado;
+    // ✅ Cargar datos en formulario (manejo consistente de fechas)
+    document.getElementById("socio-id").value = socio.id_socio;
+    document.getElementById("nombre").value = socio.nombre || '';
+    document.getElementById("apellido").value = socio.apellido || '';
+    document.getElementById("dni").value = socio.dni || '';
+    document.getElementById("email").value = socio.email || '';
+    document.getElementById("telefono").value = socio.telefono || '';
+    document.getElementById("direccion").value = socio.direccion || '';
+    document.getElementById("fechaIngreso").value = socio.fecha_ingreso?.split('T')[0] || ''; // ✅ Formato YYYY-MM-DD
+    document.getElementById("estado").value = socio.estado || 'activo';
 
-    document.getElementById("form-titulo").textContent = `Editar Socio — ${s.nombre} ${s.apellido}`;
+    document.getElementById("form-titulo").textContent = `Editar Socio — ${socio.nombre} ${socio.apellido}`;
     document.getElementById("btn-guardar").textContent = "✓ Guardar Cambios";
     document.getElementById("btn-cancelar").style.display = "inline-block";
 
@@ -160,14 +166,12 @@ async function editarSocio(id) {
 }
 
 // ─── CANCELAR EDICIÓN ─────────────────────────────────────────────────────────
-
 function cancelarEdicion() {
   limpiarFormulario();
   ocultarMensaje();
 }
 
-// ─── ELIMINAR SOCIO ───────────────────────────────────────────────────────────
-
+// ─── ELIMINAR SOCIO (✅ 100% FUNCIONAL) ───────────────────────────────────────
 function pedirEliminar(id, nombre) {
   idParaEliminar = id;
   document.getElementById("modal-nombre").textContent = nombre;
@@ -181,10 +185,13 @@ function cerrarModal() {
 
 async function confirmarEliminar() {
   if (!idParaEliminar) return;
-  cerrarModal();
-
+  
   try {
-    const res = await fetch(`${API_BASE}/${idParaEliminar}`, { method: "DELETE" });
+    // ✅ DELETE: /api/Socio/123
+    const res = await fetch(`${API_BASE}/${idParaEliminar}`, { 
+      method: "DELETE" 
+    });
+    
     const resultado = await res.json();
 
     if (!res.ok) {
@@ -193,6 +200,7 @@ async function confirmarEliminar() {
     }
 
     mostrarMensaje("Socio eliminado exitosamente.", "exito");
+    cerrarModal();
     await cargarSocios();
   } catch (err) {
     mostrarMensaje("Error de conexión: " + err.message, "error");
@@ -200,20 +208,19 @@ async function confirmarEliminar() {
 }
 
 // ─── LIMPIAR FORMULARIO ───────────────────────────────────────────────────────
-
 function limpiarFormulario() {
   document.getElementById("form-socio").reset();
   document.getElementById("socio-id").value = "";
   document.getElementById("form-titulo").textContent = "Registrar Nuevo Socio";
   document.getElementById("btn-guardar").textContent = "✓ Registrar Socio";
   document.getElementById("btn-cancelar").style.display = "none";
+  
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fechaIngreso").value = hoy;
   document.getElementById("estado").value = "activo";
 }
 
 // ─── MENSAJES ─────────────────────────────────────────────────────────────────
-
 function mostrarMensaje(texto, tipo) {
   const el = document.getElementById("mensaje");
   el.textContent = texto;
@@ -227,10 +234,11 @@ function ocultarMensaje() {
 }
 
 // ─── UTILIDADES ───────────────────────────────────────────────────────────────
-
 function formatearFecha(fecha) {
   if (!fecha) return '<span style="color:#a0aec0">—</span>';
-  const [anio, mes, dia] = fecha.split("-");
+  // ✅ Manejo consistente de fechas (YYYY-MM-DD o YYYY-MM-DDTHH:MM:SS)
+  const fechaLimpia = fecha.split('T')[0];
+  const [anio, mes, dia] = fechaLimpia.split("-");
   return `${dia}/${mes}/${anio}`;
 }
 
