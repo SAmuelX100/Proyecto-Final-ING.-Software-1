@@ -14,7 +14,7 @@ const con = new Client({
 });
 con.connect().then(() => console.log("✅ DB OK"));
 
-// Helper snake_case
+// Helper: Convierte camelCase del frontend a snake_case para PostgreSQL
 function toSnakeCase(obj) {
   const snake = {};
   for (let [key, value] of Object.entries(obj)) {
@@ -23,7 +23,7 @@ function toSnakeCase(obj) {
   return snake;
 }
 
-// ─── RUTAS DE LA API CORREGIDAS ───────────────────────────────────────────────
+// ─── API REST GENÉRICA (VÁLIDA PARA CUALQUIER TABLA) ──────────────────────────
 
 // GET: Obtener todos los registros
 app.get('/api/:tabla', async (req, res) => {
@@ -42,10 +42,13 @@ app.post('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
     const data = toSnakeCase(req.body);
-    console.log('POST', tabla, data);
+    console.log(`[POST] /api/${tabla} ->`, data);
+    
     const columns = Object.keys(data).join(', ');
     const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
-    const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, Object.values(data));
+    const values = Object.values(data);
+    
+    const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, values);
     res.json(result.rows[0]);
   } catch (e) {
     console.error('POST Error:', e.message);
@@ -58,10 +61,11 @@ app.put('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
     const data = toSnakeCase(req.body);
-    console.log('PUT', tabla, id, data);
+    console.log(`[PUT] /api/${tabla}/${id} ->`, data);
     
-    // Detectar primary key
-    const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
+    // 🔥 MAGIA: Detectar la llave primaria automáticamente (ej: id_socio, id_prestamo)
+    const pk = `id_${tabla.toLowerCase()}`; 
+    
     const updates = Object.keys(data).map((k, i) => `"${k}"=$${i+1}`).join(', ');
     const values = [...Object.values(data), id];
     
@@ -77,8 +81,11 @@ app.put('/api/:tabla/:id', async (req, res) => {
 app.delete('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
-    console.log('DELETE', tabla, id);
-    const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
+    console.log(`[DELETE] /api/${tabla}/${id}`);
+    
+    // 🔥 MAGIA: Identificar llave primaria automáticamente
+    const pk = `id_${tabla.toLowerCase()}`; 
+    
     await con.query(`DELETE FROM "${tabla}" WHERE "${pk}" = $1`, [id]);
     res.json({ ok: true });
   } catch (e) {
@@ -87,4 +94,4 @@ app.delete('/api/:tabla/:id', async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log('🌐 http://localhost:3000'));
+app.listen(3000, () => console.log('🌐 Servidor corriendo en http://localhost:3000'));

@@ -1,18 +1,19 @@
-const API_BASE   = "/api/prestamos";
-const API_SOCIOS = "/api/socios";
+const API_BASE   = "/api/Prestamo"; 
+const API_SOCIOS = "/api/Socio";    
 
 let prestamosList  = [];
+let sociosDict     = {}; 
 let idParaEliminar = null;
 let evalPrestamoId = null;
 let evalSocioNombre= null;
 
 // ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fechaSolicitud").value = hoy;
-  cargarSociosSelect();
-  cargarPrestamos();
+  await cargarSociosSelect(); 
+  await cargarPrestamos();
 });
 
 // ─── SOCIOS SELECT ────────────────────────────────────────────────────────────
@@ -22,9 +23,11 @@ async function cargarSociosSelect() {
     const res = await fetch(API_SOCIOS);
     const socios = await res.json();
     const sel = document.getElementById("socioId");
+    
     socios.forEach(s => {
+      sociosDict[s.id_socio] = `${s.nombre} ${s.apellido}`; 
       const opt = document.createElement("option");
-      opt.value = s.id;
+      opt.value = s.id_socio; 
       opt.textContent = `${s.nombre} ${s.apellido} — ${s.dni}`;
       sel.appendChild(opt);
     });
@@ -98,25 +101,27 @@ function renderTabla(lista) {
   }
   tbody.innerHTML = lista.map(p => {
     const aprobable = ["solicitado", "en_revision"].includes(p.estado);
+    const nombreSocio = sociosDict[p.id_socio] || `Socio #${p.id_socio}`; 
+    
     return `
     <tr>
-      <td>${p.id}</td>
-      <td>${escHtml(p.socioNombre || `Socio #${p.socioId}`)}</td>
+      <td>${p.id_prestamo}</td>
+      <td>${escHtml(nombreSocio)}</td>
       <td><span class="monto">${formatMonto(Number(p.monto))}</span></td>
-      <td>${Number(p.tasaInteres).toFixed(2)}%</td>
-      <td>${p.plazo} meses</td>
-      <td>${formatearFecha(p.fechaSolicitud)}</td>
+      <td>${Number(p.tasa_interes).toFixed(2)}%</td>
+      <td>${p.plazo_meses} meses</td>
+      <td>${formatearFecha(p.fecha_solicitud)}</td>
       <td><span class="badge badge-${p.estado}">${estadoLabel(p.estado)}</span></td>
       <td>
         <div class="acciones">
-          <button class="btn btn-evaluar" onclick="abrirModalEval(${p.id},'${escAttr(p.socioNombre || '')}')" ${!aprobable ? "disabled" : ""}>
+          <button class="btn btn-evaluar" onclick="abrirModalEval(${p.id_prestamo},'${escAttr(nombreSocio)}')" ${!aprobable ? "disabled" : ""}>
             &#128202; Evaluar
           </button>
-          <button class="btn btn-amortizacion" onclick="verAmortizacion(${p.id},'${escAttr(p.socioNombre || '')}',${Number(p.monto)},${Number(p.tasaInteres)},${p.plazo})">
+          <button class="btn btn-amortizacion" onclick="verAmortizacion(${p.id_prestamo},'${escAttr(nombreSocio)}',${Number(p.monto)},${Number(p.tasa_interes)},${p.plazo_meses})">
             &#128197; Cuotas
           </button>
-          <button class="btn btn-editar" onclick="editarPrestamo(${p.id})">&#9998; Editar</button>
-          <button class="btn btn-eliminar" onclick="pedirEliminar(${p.id},'${escAttr(p.socioNombre || '')}')">&#128465; Eliminar</button>
+          <button class="btn btn-editar" onclick="editarPrestamo(${p.id_prestamo})">&#9998; Editar</button>
+          <button class="btn btn-eliminar" onclick="pedirEliminar(${p.id_prestamo},'${escAttr(nombreSocio)}')">&#128465; Eliminar</button>
         </div>
       </td>
     </tr>`;
@@ -129,29 +134,53 @@ function filtrarTabla() {
   const q      = document.getElementById("buscar").value.toLowerCase();
   const estado = document.getElementById("filtro-estado").value;
   const filtrados = prestamosList
-    .filter(p => (p.socioNombre || "").toLowerCase().includes(q))
+    .filter(p => {
+        const nombreSocio = sociosDict[p.id_socio] || "";
+        return nombreSocio.toLowerCase().includes(q);
+    })
     .filter(p => !estado || p.estado === estado);
   renderTabla(filtrados);
 }
 
-// ─── GUARDAR PRÉSTAMO ─────────────────────────────────────────────────────────
+// ─── GUARDAR PRÉSTAMO (CON FECHA Y USUARIO DE APROBACIÓN) ─────────────────────
 
 async function guardarPrestamo(e) {
   e.preventDefault();
   const id = document.getElementById("prestamo-id").value;
+  const estadoSeleccionado = document.getElementById("estado").value;
+  
   const datos = {
-    socioId:        Number(document.getElementById("socioId").value),
+    idSocio:        Number(document.getElementById("socioId").value), 
     monto:          String(Number(document.getElementById("monto").value)),
-    tasaInteres:    String(Number(document.getElementById("tasaInteres").value)),
-    plazo:          Number(document.getElementById("plazo").value),
-    fechaSolicitud: document.getElementById("fechaSolicitud").value,
-    estado:         document.getElementById("estado").value,
+    tasaInteres:    String(Number(document.getElementById("tasaInteres").value)), 
+    plazoMeses:     Number(document.getElementById("plazo").value), 
+    fechaSolicitud: document.getElementById("fechaSolicitud").value, 
+    estado:         estadoSeleccionado,
   };
-  if (!datos.socioId || !datos.monto || !datos.plazo || !datos.fechaSolicitud) {
+
+  // 🔥 Lógica de auditoría para aprobación manual
+  const estadosAprobados = ["aprobado", "desembolsado", "pagado"];
+  
+  if (estadosAprobados.includes(estadoSeleccionado)) {
+    const p = id ? prestamosList.find(x => x.id_prestamo == id) : null;
+    
+    datos.fechaAprobacion = (p && p.fecha_aprobacion) 
+        ? p.fecha_aprobacion.split('T')[0] 
+        : new Date().toISOString().split("T")[0];
+    
+    datos.aprobadoPor = (p && p.aprobado_por) 
+        ? p.aprobado_por 
+        : Number(localStorage.getItem("user_id"));
+  } else {
+    datos.fechaAprobacion = null;
+    datos.aprobadoPor = null;
+  }
+
+  if (!datos.idSocio || !datos.monto || !datos.plazoMeses || !datos.fechaSolicitud) {
     mostrarMensaje("Socio, Monto, Plazo y Fecha son obligatorios.", "error"); return;
   }
   if (Number(datos.monto) <= 0) { mostrarMensaje("El monto debe ser mayor a cero.", "error"); return; }
-  if (datos.plazo < 1) { mostrarMensaje("El plazo debe ser al menos 1 mes.", "error"); return; }
+  if (datos.plazoMeses < 1) { mostrarMensaje("El plazo debe ser al menos 1 mes.", "error"); return; }
 
   const btn = document.getElementById("btn-guardar");
   btn.disabled = true;
@@ -163,7 +192,7 @@ async function guardarPrestamo(e) {
     });
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al guardar.", "error"); return; }
-    mostrarMensaje(id ? "Préstamo actualizado exitosamente." : `Préstamo registrado (ID: ${resultado.id}).`, "exito");
+    mostrarMensaje(id ? "Préstamo actualizado exitosamente." : `Préstamo registrado (ID: ${resultado.id_prestamo}).`, "exito");
     limpiarFormulario();
     await cargarPrestamos();
   } catch (err) {
@@ -173,19 +202,20 @@ async function guardarPrestamo(e) {
 
 // ─── EDITAR ───────────────────────────────────────────────────────────────────
 
-async function editarPrestamo(id) {
+function editarPrestamo(id) {
   try {
-    const res = await fetch(`${API_BASE}/${id}`);
-    if (!res.ok) throw new Error("No encontrado");
-    const p = await res.json();
-    document.getElementById("prestamo-id").value       = p.id;
-    document.getElementById("socioId").value           = p.socioId;
+    const p = prestamosList.find(x => x.id_prestamo === id);
+    if (!p) throw new Error("Préstamo no encontrado en la lista actual");
+
+    document.getElementById("prestamo-id").value       = p.id_prestamo;
+    document.getElementById("socioId").value           = p.id_socio;
     document.getElementById("monto").value             = Number(p.monto).toFixed(2);
-    document.getElementById("tasaInteres").value       = Number(p.tasaInteres).toFixed(2);
-    document.getElementById("plazo").value             = p.plazo;
-    document.getElementById("fechaSolicitud").value    = p.fechaSolicitud || "";
+    document.getElementById("tasaInteres").value       = Number(p.tasa_interes).toFixed(2);
+    document.getElementById("plazo").value             = p.plazo_meses;
+    document.getElementById("fechaSolicitud").value    = p.fecha_solicitud?.split('T')[0] || "";
     document.getElementById("estado").value            = p.estado;
-    document.getElementById("form-titulo").textContent = `Editar Préstamo #${p.id}`;
+    
+    document.getElementById("form-titulo").textContent = `Editar Préstamo #${p.id_prestamo}`;
     document.getElementById("btn-guardar").textContent = "✓ Guardar Cambios";
     document.getElementById("btn-cancelar").style.display = "inline-block";
     calcularCuota();
@@ -193,7 +223,7 @@ async function editarPrestamo(id) {
   } catch (err) { mostrarMensaje("No se pudo cargar: " + err.message, "error"); }
 }
 
-// ─── MODAL EVALUACIÓN ─────────────────────────────────────────────────────────
+// ─── MODAL EVALUACIÓN Y DECISIÓN (CON FECHA Y USUARIO) ────────────────────────
 
 async function abrirModalEval(id, socioNombre) {
   evalPrestamoId  = id;
@@ -223,7 +253,7 @@ async function abrirModalEval(id, socioNombre) {
     `;
     document.getElementById("eval-decision").style.display = "flex";
   } catch (err) {
-    document.getElementById("eval-contenido").innerHTML = '<p>Error al evaluar.</p>';
+    document.getElementById("eval-contenido").innerHTML = '<p>Error al evaluar. Asegúrate de tener este endpoint configurado en el backend.</p>';
   }
 }
 
@@ -235,20 +265,44 @@ function cerrarModalEval() {
 async function tomarDecision(decision) {
   if (!evalPrestamoId) return;
   try {
-    const res = await fetch(`${API_BASE}/${evalPrestamoId}/decision`, {
+    const prestamo = prestamosList.find(p => p.id_prestamo === evalPrestamoId);
+    
+    // 🔥 Reutilizamos tu API genérica para actualizar el estado
+    const datosActualizados = {
+        idSocio:        prestamo.id_socio,
+        monto:          prestamo.monto,
+        tasaInteres:    prestamo.tasa_interes,
+        plazoMeses:     prestamo.plazo_meses,
+        fechaSolicitud: prestamo.fecha_solicitud?.split('T')[0],
+        estado:         decision === "aprobado" ? "aprobado" : "rechazado",
+    };
+
+    // Si aprueba, inyectamos fecha y usuario
+    if (decision === "aprobado") {
+        datosActualizados.fechaAprobacion = new Date().toISOString().split("T")[0];
+        datosActualizados.aprobadoPor = Number(localStorage.getItem("user_id"));
+    } else {
+        datosActualizados.fechaAprobacion = null;
+        datosActualizados.aprobadoPor = null;
+    }
+
+    const res = await fetch(`${API_BASE}/${evalPrestamoId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision }),
+      body: JSON.stringify(datosActualizados),
     });
+    
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error.", "error"); return; }
+    
     cerrarModalEval();
     mostrarMensaje(
-      `Préstamo ${decision === "aprobado" ? "aprobado" : "rechazado"} exitosamente.` +
-      (decision === "aprobado" ? " Se generó la tabla de amortización." : ""), "exito"
+      `Préstamo ${decision === "aprobado" ? "aprobado" : "rechazado"} exitosamente.`, "exito"
     );
     await cargarPrestamos();
-  } catch (err) { mostrarMensaje("Error de conexión.", "error"); }
+  } catch (err) { 
+    mostrarMensaje("Error de conexión.", "error"); 
+  }
 }
 
 // ─── MODAL AMORTIZACIÓN ───────────────────────────────────────────────────────
@@ -291,7 +345,7 @@ async function verAmortizacion(id, socioNombre, monto, tasa, plazo) {
       `Capital: <span class="monto-verde">${formatMonto(totalCapital)}</span> &nbsp;|&nbsp; ` +
       `Intereses: <span class="monto-rojo">${formatMonto(totalInteres)}</span>`;
   } catch (err) {
-    document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Error al cargar.</td></tr>';
+    document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Error al cargar. Asegúrate de tener este endpoint en el backend.</td></tr>';
   }
 }
 
@@ -318,12 +372,13 @@ function cerrarModal() {
 
 async function confirmarEliminar() {
   if (!idParaEliminar) return;
-  cerrarModal();
+  
   try {
     const res = await fetch(`${API_BASE}/${idParaEliminar}`, { method: "DELETE" });
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al eliminar.", "error"); return; }
     mostrarMensaje("Préstamo eliminado exitosamente.", "exito");
+    cerrarModal();
     await cargarPrestamos();
   } catch (err) { mostrarMensaje("Error de conexión: " + err.message, "error"); }
 }
@@ -360,7 +415,8 @@ function formatMonto(v) {
 }
 function formatearFecha(f) {
   if (!f) return '<span style="color:#a0aec0">—</span>';
-  const [a, m, d] = f.split("-");
+  const fechaLimpia = f.split('T')[0];
+  const [a, m, d] = fechaLimpia.split("-");
   return `${d}/${m}/${a}`;
 }
 function estadoLabel(e) {
