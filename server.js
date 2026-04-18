@@ -38,4 +38,22 @@ app.use('/api/:tabla', async (req, res) => {
   }
 });
 
+app.use('/api/:tabla/:id', async (req, res) => {
+  const { tabla, id } = req.params;
+  try {
+    if (req.method === 'PUT') {
+      const updates = Object.keys(req.body).map((key, index) => `"${key}" = $${index + 1}`).join(', ');
+      const values = [...Object.values(req.body), id];
+      const result = await con.query(`UPDATE "${tabla}" SET ${updates} WHERE id_socio = $${values.length} RETURNING *`, values);
+      res.json(result.rows[0] || { mensaje: 'Actualizado' });
+    } else if (req.method === 'DELETE') {
+      await con.query(`DELETE FROM "${tabla}" WHERE id_socio = $1`, [id]);
+      res.json({ mensaje: 'Eliminado correctamente' });
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(3000, () => console.log('🌐 http://localhost:3000'));
