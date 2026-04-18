@@ -3,67 +3,71 @@ const { Client } = require('pg');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(__dirname)); // Sirve HTML/CSS/JS
+app.use(express.static(__dirname));
 
-// TU CONEXIÓN
 const con = new Client({
-  host: "localhost",
-  user: "postgres",
-  port: 5433,
-  password: "samuel1",
-  database: "CooperativaDB"
+  host: "localhost", user: "postgres", port: 5433, 
+  password: "samuel1", database: "CooperativaDB"
 });
+con.connect().then(() => console.log("✅ DB OK"));
 
-con.connect().then(() => console.log("✅ DB conectada"))
-  .catch(err => console.error("❌ Error DB:", err));
+// 🔧 FUNCIÓN snake_case helper
+function toSnakeCase(obj) {
+  const snake = {};
+  for (let [key, value] of Object.entries(obj)) {
+    const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    snake[snakeKey] = value;
+  }
+  return snake;
+}
 
-// ⭐️ CRUD GENÉRICO - FUNCIONA CON CUALQUIER TABLA
+// ⭐️ GET/POST - Cualquier tabla
 app.use('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
     if (req.method === 'POST') {
-      // INSERT genérico
-      const columns = Object.keys(req.body).join(', ');
-      const values = Object.values(req.body).map((_, i) => `$${i + 1}`).join(', ');
-      const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${values}) RETURNING *`, Object.values(req.body));
+      const data = toSnakeCase(req.body);
+      console.log('INSERT →', tabla, data);
+      
+      const columns = Object.keys(data).join(', ');
+      const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
+      const result = await con.query(
+        `INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, 
+        Object.values(data)
+      );
       res.json(result.rows[0]);
     } else {
-      // SELECT genérico
       const result = await con.query(`SELECT * FROM "${tabla}"`);
       res.json(result.rows);
     }
   } catch (error) {
-    console.error(error);
+    console.error('POST/GET Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
+// ⭐️ PUT/DELETE - Cualquier tabla/:id
 app.use('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
     if (req.method === 'PUT') {
-      // Convertir camelCase → snake_case
-      const snakeCaseData = {};
-      for (let [key, value] of Object.entries(req.body)) {
-        const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-        snakeCaseData[snakeKey] = value;
-      }
+      const data = toSnakeCase(req.body);
+      console.log('UPDATE →', tabla, id, data);
       
-      const updates = Object.keys(snakeCaseData).map((key, index) => `"${key}" = $${index + 1}`).join(', ');
-      const values = [...Object.values(snakeCaseData), id];
-      
-      console.log('UPDATE:', tabla, updates, values); // Debug
-      
-      const result = await con.query(`UPDATE "${tabla}" SET ${updates} WHERE id_socio = $${values.length} RETURNING *`, values);
-      res.json(result.rows[0] || { mensaje: 'Actualizado' });
-      
+      const updates = Object.keys(data).map((k, i) => `"${k}" = $${i+1}`).join(', ');
+      const values = [...Object.values(data), id];
+      const result = await con.query(
+        `UPDATE "${tabla}" SET ${updates} WHERE id_socio = $${values.length} RETURNING *`, 
+        values
+      );
+      res.json(result.rows[0] || { ok: true });
     } else if (req.method === 'DELETE') {
+      console.log('DELETE →', tabla, id);
       await con.query(`DELETE FROM "${tabla}" WHERE id_socio = $1`, [id]);
-      console.log('DELETE:', tabla, id); // Debug
-      res.json({ mensaje: 'Eliminado correctamente' });
+      res.json({ ok: true });
     }
   } catch (error) {
-    console.error('Error completo:', error);
+    console.error('PUT/DELETE Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,4 +1,4 @@
-const API_BASE = "/api/Socio"; ;
+const API_BASE = "/api/Socio"; 
 
 let sociosList = [];
 let idParaEliminar = null;
