@@ -1,0 +1,32 @@
+/* Estilos específicos para el módulo de Pagos */
+
+.resumen-rechazados { background: #fff5f5; color: #822727; }
+
+/* Badges de estado de pago */
+.badge-completado { background: #c6f6d5; color: #22543d; }
+.badge-parcial    { background: #feebc8; color: #744210; }
+
+/* Estilo para filas de mora alta */
+.fila-mora-alta { background-color: #fff5f5; }
+
+/* Ajustes para el selector de cuotas */
+#cuotaId option {
+  padding: 8px;
+}
+
+/* Contenedor de info de pago */
+#info-pago {
+  border-left: 4px solid #4299e1;
+}
+
+/* Resaltado de mora en la tabla */
+.mora-valor {
+  color: #e53e3e;
+  font-weight: 600;
+}
+
+/* Estilo para el total en el historial */
+.total-pagado-celda {
+  font-weight: 700;
+  color: #2c5282;
+}

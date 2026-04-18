@@ -1,0 +1,66 @@
+/* RESUMEN TARJETAS */
+.resumen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.resumen-card {
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.resumen-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+.resumen-valor { font-size: 1.6rem; font-weight: 700; }
+.resumen-total     { background: #ebf4ff; color: #2b6cb0; }
+.resumen-validadas { background: #c6f6d5; color: #22543d; }
+.resumen-pendientes{ background: #fefcbf; color: #744210; }
+.resumen-count     { background: #e9d8fd; color: #44337a; }
+
+/* FILTROS */
+.filtro-select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  color: #2d3748;
+  background: #fff;
+  cursor: pointer;
+}
+.filtro-select:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+}
+
+/* BADGES TIPO */
+.badge-cuota_mensual          { background: #bee3f8; color: #2a4365; }
+.badge-aportacion_extraordinaria { background: #e9d8fd; color: #44337a; }
+.badge-ahorro                 { background: #c6f6d5; color: #22543d; }
+.badge-prestamo               { background: #fefcbf; color: #744210; }
+
+/* BADGES ESTADO */
+.badge-pendiente { background: #fefcbf; color: #744210; }
+.badge-validada  { background: #c6f6d5; color: #22543d; }
+.badge-rechazada { background: #fed7d7; color: #742a2a; }
+
+/* MONTO */
+.monto { font-weight: 700; color: #2b6cb0; }
+
+/* BOTÓN VALIDAR */
+.btn-validar {
+  background: #68d391;
+  color: #22543d;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+.btn-validar:hover { background: #38a169; color: white; }
+.btn-validar:disabled { background: #e2e8f0; color: #a0aec0; cursor: not-allowed; }

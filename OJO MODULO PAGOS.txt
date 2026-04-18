@@ -1,0 +1,1 @@
+este módulo solo muestra préstamos que ya tienen cuotas generadas. Las cuotas se generan automáticamente cuando apruebas un préstamo en el módulo de Préstamos. También actualiza el estado del préstamo a "Pagado" cuando se registra la última cuota.

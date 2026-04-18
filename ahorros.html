@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Ahorros</title>
+  <link rel="stylesheet" href="./socios.css">
+  <link rel="stylesheet" href="./ahorros.css">
+</head>
+<body>
+
+  <header>
+    <h1>🏠 Sistema de Control de Cooperativas - COOPBARAHONA</h1>
+    <p>Ahorros</p>
+  </header>
+
+  <main>
+
+    <!-- TARJETAS RESUMEN -->
+    <div class="resumen-grid" id="resumen-grid" style="display:none;">
+      <div class="resumen-card resumen-total">
+        <span class="resumen-label">Saldo Total</span>
+        <span class="resumen-valor" id="res-saldo">RD$ 0.00</span>
+      </div>
+      <div class="resumen-card resumen-activas">
+        <span class="resumen-label">Cuentas Activas</span>
+        <span class="resumen-valor" id="res-activas">0</span>
+      </div>
+      <div class="resumen-card resumen-cerradas">
+        <span class="resumen-label">Cuentas Cerradas</span>
+        <span class="resumen-valor" id="res-cerradas">0</span>
+      </div>
+      <div class="resumen-card resumen-count">
+        <span class="resumen-label">Total Cuentas</span>
+        <span class="resumen-valor" id="res-count">0</span>
+      </div>
+    </div>
+
+    <!-- FORMULARIO CUENTA -->
+    <section class="card">
+      <h2 id="form-titulo">Abrir Nueva Cuenta de Ahorro</h2>
+
+      <form id="form-ahorro" onsubmit="guardarCuenta(event)">
+        <input type="hidden" id="ahorro-id">
+
+        <div class="form-grid">
+          <div class="campo">
+            <label for="socioId">Socio *</label>
+            <select id="socioId" required>
+              <option value="">-- Seleccionar socio --</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="numeroCuenta">Número de Cuenta *</label>
+            <input type="text" id="numeroCuenta" placeholder="Ej: AHO-2024-001" required>
+          </div>
+          <div class="campo">
+            <label for="saldo">Saldo Inicial (RD$)</label>
+            <input type="number" id="saldo" min="0" step="0.01" placeholder="Ej: 0.00" value="0">
+          </div>
+          <div class="campo">
+            <label for="fechaApertura">Fecha de Apertura *</label>
+            <input type="date" id="fechaApertura" required>
+          </div>
+          <div class="campo">
+            <label for="estado">Estado</label>
+            <select id="estado">
+              <option value="activa">Activa</option>
+              <option value="inactiva">Inactiva</option>
+              <option value="cerrada">Cerrada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-acciones">
+          <button type="submit" class="btn btn-primary" id="btn-guardar">✓ Abrir Cuenta</button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarEdicion()" id="btn-cancelar" style="display:none;">✗ Cancelar</button>
+        </div>
+      </form>
+
+      <div id="mensaje" class="mensaje" style="display:none;"></div>
+    </section>
+
+    <!-- TABLA -->
+    <section class="card">
+      <div class="tabla-header">
+        <h2>Cuentas de Ahorro</h2>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <select id="filtro-estado" onchange="filtrarTabla()" class="filtro-select">
+            <option value="">Todos los estados</option>
+            <option value="activa">Activa</option>
+            <option value="inactiva">Inactiva</option>
+            <option value="cerrada">Cerrada</option>
+          </select>
+          <div class="busqueda">
+            <input type="text" id="buscar" placeholder="🔍 Buscar socio o cuenta..." oninput="filtrarTabla()">
+          </div>
+        </div>
+      </div>
+
+      <div class="tabla-container">
+        <table id="tabla-ahorros">
+          <thead>
+            <tr>
+              <th>ID</th><th>Socio</th><th>N° Cuenta</th>
+              <th>Saldo</th><th>Fecha Apertura</th><th>Estado</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-ahorros">
+            <tr><td colspan="7" class="cargando">Cargando cuentas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tabla-footer"><span id="total-cuentas">Total: 0 cuentas</span></div>
+    </section>
+  </main>
+
+  <!-- MODAL DEPÓSITO/RETIRO -->
+  <div id="modal-transaccion" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3 id="modal-tx-titulo">💰 Depósito</h3>
+      <p>Cuenta: <strong id="modal-tx-cuenta"></strong></p>
+      <p>Saldo actual: <strong id="modal-tx-saldo" class="monto-verde"></strong></p>
+      <div class="campo" style="margin-top:16px;">
+        <label for="tx-monto">Monto (RD$) *</label>
+        <input type="number" id="tx-monto" min="0.01" step="0.01" placeholder="Ej: 500.00">
+      </div>
+      <div class="campo" style="margin-top:10px;">
+        <label for="tx-descripcion">Descripción</label>
+        <input type="text" id="tx-descripcion" placeholder="Opcional...">
+      </div>
+      <div id="msg-transaccion" class="mensaje" style="display:none;margin-top:12px;"></div>
+      <div class="modal-acciones">
+        <button class="btn btn-primary" id="btn-tx-confirmar" onclick="confirmarTransaccion()">Confirmar</button>
+        <button class="btn btn-secondary" onclick="cerrarModalTx()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL HISTORIAL -->
+  <div id="modal-historial" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3>📋 Historial de Transacciones</h3>
+        <button class="btn btn-secondary" onclick="cerrarModalHistorial()" style="padding:5px 14px;">✗</button>
+      </div>
+      <p style="margin-bottom:14px;">Cuenta: <strong id="hist-cuenta"></strong> &nbsp;|&nbsp; Socio: <strong id="hist-socio"></strong></p>
+      <div class="tabla-container">
+        <table>
+          <thead><tr><th>ID</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th>Descripción</th></tr></thead>
+          <tbody id="tbody-historial"><tr><td colspan="5" class="cargando">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;text-align:right;font-size:0.85rem;color:#718096;" id="hist-total"></div>
+    </div>
+  </div>
+
+  <!-- MODAL ELIMINAR -->
+  <div id="modal-eliminar" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>⚠ Confirmar Eliminación</h3>
+      <p>¿Estás seguro de que deseas eliminar la cuenta <strong id="modal-nombre"></strong>?</p>
+      <p class="modal-aviso">Esta acción eliminará también todo el historial de transacciones.</p>
+      <div class="modal-acciones">
+        <button class="btn btn-danger" onclick="confirmarEliminar()">Sí, Eliminar</button>
+        <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./ahorros.js"></script>
+</body>
+</html>

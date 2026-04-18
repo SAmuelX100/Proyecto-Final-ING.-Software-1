@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Socios</title>
+  <link rel="stylesheet" href="./socios.css">
+</head>
+<body>
+
+  <header>
+    <h1>🏠 Sistema de Control de Cooperativas - COOPBARAHONA</h1>
+    <p>Socios / Miembros</p>
+  </header>
+
+  <main>
+
+    <!-- FORMULARIO -->
+    <section class="card">
+      <h2 id="form-titulo">Registrar Nuevo Socio</h2>
+
+      <form id="form-socio" onsubmit="guardarSocio(event)">
+        <input type="hidden" id="socio-id">
+
+        <div class="form-grid">
+          <div class="campo">
+            <label for="nombre">Nombre *</label>
+            <input type="text" id="nombre" placeholder="Ej: Juan" required>
+          </div>
+
+          <div class="campo">
+            <label for="apellido">Apellido *</label>
+            <input type="text" id="apellido" placeholder="Ej: Pérez" required>
+          </div>
+
+          <div class="campo">
+            <label for="dni">Cédula / DNI *</label>
+            <input type="text" id="dni" placeholder="Ej: 00112345678" required>
+          </div>
+
+          <div class="campo">
+            <label for="email">Correo electrónico</label>
+            <input type="email" id="email" placeholder="Ej: juan@email.com">
+          </div>
+
+          <div class="campo">
+            <label for="telefono">Teléfono</label>
+            <input type="text" id="telefono" placeholder="Ej: 8091234567">
+          </div>
+
+          <div class="campo">
+            <label for="direccion">Dirección</label>
+            <input type="text" id="direccion" placeholder="Ej: Calle 1, Sector A">
+          </div>
+
+          <div class="campo">
+            <label for="fechaIngreso">Fecha de Ingreso</label>
+            <input type="date" id="fechaIngreso">
+          </div>
+
+          <div class="campo">
+            <label for="estado">Estado</label>
+            <select id="estado">
+              <option value="activo">Activo</option>
+              <option value="inactivo">Inactivo</option>
+              <option value="suspendido">Suspendido</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-acciones">
+          <button type="submit" class="btn btn-primary" id="btn-guardar">
+            ✓ Registrar Socio
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarEdicion()" id="btn-cancelar" style="display:none;">
+            ✗ Cancelar
+          </button>
+        </div>
+      </form>
+
+      <div id="mensaje" class="mensaje" style="display:none;"></div>
+    </section>
+
+    <!-- TABLA DE SOCIOS -->
+    <section class="card">
+      <div class="tabla-header">
+        <h2>Socios Registrados</h2>
+        <div class="busqueda">
+          <input type="text" id="buscar" placeholder="🔍 Buscar por nombre, cédula..." oninput="filtrarTabla()">
+        </div>
+      </div>
+
+      <div class="tabla-container">
+        <table id="tabla-socios">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nombre Completo</th>
+              <th>Cédula / DNI</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th>Dirección</th>
+              <th>Fecha Ingreso</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-socios">
+            <tr>
+              <td colspan="9" class="cargando">Cargando socios...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tabla-footer">
+        <span id="total-socios">Total: 0 socios</span>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL DE CONFIRMACIÓN -->
+  <div id="modal-eliminar" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>⚠ Confirmar Eliminación</h3>
+      <p>¿Estás seguro de que deseas eliminar a <strong id="modal-nombre"></strong>?</p>
+      <p class="modal-aviso">Esta acción no se puede deshacer.</p>
+      <div class="modal-acciones">
+        <button class="btn btn-danger" onclick="confirmarEliminar()">Sí, Eliminar</button>
+        <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./socios.js"></script>
+</body>
+</html>

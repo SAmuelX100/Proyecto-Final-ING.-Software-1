@@ -1,0 +1,137 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f4f8;
+  color: #2d3748;
+  min-height: 100vh;
+}
+
+/* HEADER */
+header {
+  background: linear-gradient(135deg, #2b6cb0, #1a365d);
+  color: white;
+  padding: 20px 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+header h1 { font-size: 1.6rem; font-weight: 700; }
+header p { font-size: 0.9rem; opacity: 0.85; margin-top: 4px; }
+
+/* MAIN */
+main {
+  max-width: 1200px;
+  margin: 30px auto;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+/* CARD */
+.card {
+  background: white;
+  border-radius: 10px;
+  padding: 25px 30px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+.card h2 {
+  font-size: 1.2rem; font-weight: 600; color: #2b6cb0;
+  border-bottom: 2px solid #ebf4ff;
+  padding-bottom: 10px; margin-bottom: 20px;
+}
+
+/* FORMULARIO */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+.campo { display: flex; flex-direction: column; gap: 5px; }
+.campo label { font-size: 0.85rem; font-weight: 600; color: #4a5568; }
+.campo input, .campo select {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #2d3748;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #fff;
+}
+.campo input:focus, .campo select:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66,153,225,0.15);
+}
+.campo input::placeholder { color: #a0aec0; }
+
+/* BOTONES */
+.form-acciones { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+  padding: 10px 22px; border: none; border-radius: 6px;
+  font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: #3182ce; color: white; }
+.btn-primary:hover { background: #2b6cb0; }
+.btn-secondary { background: #e2e8f0; color: #4a5568; }
+.btn-secondary:hover { background: #cbd5e0; }
+.btn-danger { background: #e53e3e; color: white; }
+.btn-danger:hover { background: #c53030; }
+.btn-editar { background: #f6ad55; color: #7b341e; padding: 5px 12px; font-size: 0.8rem; }
+.btn-editar:hover { background: #ed8936; }
+.btn-eliminar { background: #fc8181; color: #742a2a; padding: 5px 12px; font-size: 0.8rem; }
+.btn-eliminar:hover { background: #e53e3e; color: white; }
+
+/* MENSAJE */
+.mensaje { margin-top: 16px; padding: 12px 16px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; }
+.mensaje.exito { background: #c6f6d5; color: #22543d; border-left: 4px solid #38a169; }
+.mensaje.error { background: #fed7d7; color: #742a2a; border-left: 4px solid #e53e3e; }
+
+/* TABLA */
+.tabla-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.tabla-header h2 { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.busqueda input { padding: 8px 14px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.9rem; width: 260px; }
+.busqueda input:focus { outline: none; border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+.tabla-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+thead { background: #ebf4ff; }
+th { padding: 11px 13px; text-align: left; font-weight: 600; color: #2b6cb0; white-space: nowrap; }
+td { padding: 11px 13px; border-bottom: 1px solid #e2e8f0; color: #4a5568; }
+tbody tr:hover { background: #f7fafc; }
+.cargando { text-align: center; color: #a0aec0; padding: 30px !important; }
+
+/* BADGE ESTADO */
+.badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; text-transform: capitalize; }
+.badge-activo { background: #c6f6d5; color: #22543d; }
+.badge-inactivo { background: #e2e8f0; color: #4a5568; }
+.badge-suspendido { background: #fed7d7; color: #742a2a; }
+
+/* ACCIONES */
+.acciones { display: flex; gap: 6px; white-space: nowrap; }
+.tabla-footer { margin-top: 14px; font-size: 0.85rem; color: #718096; text-align: right; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.modal { background: white; border-radius: 10px; padding: 30px; max-width: 420px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.25); }
+.modal h3 { font-size: 1.15rem; color: #c53030; margin-bottom: 14px; }
+.modal p { color: #4a5568; margin-bottom: 8px; }
+.modal-aviso { font-size: 0.82rem; color: #a0aec0; }
+.modal-acciones { display: flex; gap: 12px; margin-top: 22px; justify-content: flex-end; }
+
+/* RESPONSIVE */
+@media (max-width: 640px) {
+  header h1 { font-size: 1.2rem; }
+  .form-grid { grid-template-columns: 1fr; }
+  .tabla-header { flex-direction: column; align-items: flex-start; }
+  .busqueda input { width: 100%; }
+}

@@ -1,0 +1,112 @@
+/* Estilos para el Dashboard Principal */
+
+.main-header {
+  background: #2d3748;
+  color: white;
+  padding: 15px 0;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.btn-logout {
+  background: #e53e3e;
+  color: white;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dashboard-container {
+  max-width: 1200px;
+  margin: 30px auto;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* Cuadrícula de Módulos */
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.module-card {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  border: 1px solid #e2e8f0;
+}
+
+.module-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  border-color: #4299e1;
+}
+
+.module-icon {
+  font-size: 2.5rem;
+  background: #f7fafc;
+  width: 70px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.module-info h3 {
+  margin: 0 0 5px 0;
+  color: #2d3748;
+}
+
+.module-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #718096;
+  line-height: 1.4;
+}
+
+/* Actividad Reciente */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  border-left: 4px solid #cbd5e0;
+}
+
+.activity-item strong { color: #2d3748; }
+.activity-time { color: #a0aec0; font-size: 0.8rem; }

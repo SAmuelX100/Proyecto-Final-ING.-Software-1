@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Control - Cooperativa</title>
+  <link rel="stylesheet" href="./socios.css">
+  <link rel="stylesheet" href="./index.css">
+</head>
+<body>
+
+  <header class="main-header">
+    <div class="header-content">
+      <h1>🏠 Sistema de Control de Cooperativas - COOPBARAHONA</h1>
+      <div class="user-info">
+        <span id="user-display">Bienvenido, Administrador</span>
+        <button class="btn btn-logout" onclick="cerrarSesion()">Cerrar Sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard-container">
+    
+    <!-- ESTADÍSTICAS GLOBALES -->
+    <section class="stats-overview">
+      <div class="resumen-grid">
+        <div class="resumen-card resumen-total">
+          <span class="resumen-label">Total Socios</span>
+          <span class="resumen-valor" id="stat-socios">0</span>
+        </div>
+        <div class="resumen-card resumen-aprobados">
+          <span class="resumen-label">Cartera Préstamos</span>
+          <span class="resumen-valor" id="stat-prestamos">RD$ 0.00</span>
+        </div>
+        <div class="resumen-card resumen-pendientes">
+          <span class="resumen-label">Ahorros Totales</span>
+          <span class="resumen-valor" id="stat-ahorros">RD$ 0.00</span>
+        </div>
+        <div class="resumen-card resumen-count">
+          <span class="resumen-label">Capital Social</span>
+          <span class="resumen-valor" id="stat-capital">RD$ 0.00</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENÚ DE MÓDULOS-->
+    <section class="modules-grid">
+      
+      <a href="./socios.html" class="module-card">
+        <div class="module-icon">👥</div>
+        <div class="module-info">
+          <h3>Socios / Miembros</h3>
+          <p>Registro, actualización y listado de socios.</p>
+        </div>
+      </a>
+
+      <a href="./aportaciones.html" class="module-card">
+        <div class="module-icon">💰</div>
+        <div class="module-info">
+          <h3>Aportaciones</h3>
+          <p>Control de capital social y aportes mensuales.</p>
+        </div>
+      </a>
+
+      <a href="./ahorros.html" class="module-card">
+        <div class="module-icon">🏦</div>
+        <div class="module-info">
+          <h3>Ahorros</h3>
+          <p>Cuentas de ahorro, depósitos y retiros.</p>
+        </div>
+      </a>
+
+      <a href="./prestamos.html" class="module-card">
+        <div class="module-icon">📄</div>
+        <div class="module-info">
+          <h3>Préstamos / Créditos</h3>
+          <p>Solicitudes, evaluación y amortización.</p>
+        </div>
+      </a>
+
+      <a href="./pagos.html" class="module-card">
+        <div class="module-icon">💳</div>
+        <div class="module-info">
+          <h3>Pagos / Cuotas</h3>
+          <p>Cobros, control de mora y recibos.</p>
+        </div>
+      </a>
+
+      <a href="./reportes.html" class="module-card">
+        <div class="module-icon">📊</div>
+        <div class="module-info">
+          <h3>Reportes</h3>
+          <p>Informes financieros y exportación de datos.</p>
+        </div>
+      </a>
+
+    </section>
+
+    <!-- ACTIVIDAD RECIENTE -->
+    <section class="card recent-activity">
+      <h2>🔔 Actividad Reciente</h2>
+      <div class="activity-list" id="activity-list">
+        <p class="cargando">Cargando últimas acciones...</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="./index.js"></script>
+</body>
+</html>

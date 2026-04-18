@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Préstamos</title>
+  <link rel="stylesheet" href="./socios.css">
+  <link rel="stylesheet" href="./prestamos.css">
+</head>
+<body>
+
+  <header>
+    <h1>🏠 Sistema de Control de Cooperativas - COOPBARAHONA</h1>
+    <p>Préstamos / Créditos</p>
+  </header>
+
+  <main>
+
+    <!-- TARJETAS RESUMEN -->
+    <div class="resumen-grid" id="resumen-grid" style="display:none;">
+      <div class="resumen-card resumen-total">
+        <span class="resumen-label">Monto Total</span>
+        <span class="resumen-valor" id="res-monto">RD$ 0.00</span>
+      </div>
+      <div class="resumen-card resumen-aprobados">
+        <span class="resumen-label">Aprobados</span>
+        <span class="resumen-valor" id="res-aprobados">0</span>
+      </div>
+      <div class="resumen-card resumen-pendientes">
+        <span class="resumen-label">Solicitados</span>
+        <span class="resumen-valor" id="res-solicitados">0</span>
+      </div>
+      <div class="resumen-card resumen-count">
+        <span class="resumen-label">Total Registros</span>
+        <span class="resumen-valor" id="res-count">0</span>
+      </div>
+    </div>
+
+    <!-- FORMULARIO -->
+    <section class="card">
+      <h2 id="form-titulo">Solicitar Nuevo Préstamo</h2>
+
+      <form id="form-prestamo" onsubmit="guardarPrestamo(event)">
+        <input type="hidden" id="prestamo-id">
+
+        <div class="form-grid">
+          <div class="campo">
+            <label for="socioId">Socio *</label>
+            <select id="socioId" required>
+              <option value="">-- Seleccionar socio --</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="monto">Monto (RD$) *</label>
+            <input type="number" id="monto" min="1" step="0.01" placeholder="Ej: 50000.00" required oninput="calcularCuota()">
+          </div>
+
+          <div class="campo">
+            <label for="tasaInteres">Tasa de Interés Anual (%) *</label>
+            <input type="number" id="tasaInteres" min="0" max="100" step="0.01" placeholder="Ej: 18.00" required oninput="calcularCuota()">
+          </div>
+
+          <div class="campo">
+            <label for="plazo">Plazo (meses) *</label>
+            <input type="number" id="plazo" min="1" max="360" step="1" placeholder="Ej: 24" required oninput="calcularCuota()">
+          </div>
+
+          <div class="campo">
+            <label for="fechaSolicitud">Fecha de Solicitud *</label>
+            <input type="date" id="fechaSolicitud" required>
+          </div>
+
+          <div class="campo">
+            <label for="estado">Estado</label>
+            <select id="estado">
+              <option value="solicitado">Solicitado</option>
+              <option value="en_revision">En Revisión</option>
+              <option value="aprobado">Aprobado</option>
+              <option value="rechazado">Rechazado</option>
+              <option value="desembolsado">Desembolsado</option>
+              <option value="pagado">Pagado</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- CALCULADORA CUOTA (aparece al llenar monto/tasa/plazo) -->
+        <div id="calc-cuota" class="evaluacion-box" style="display:none; margin-bottom:16px;">
+          <div class="eval-item">
+            <span class="eval-label">Cuota mensual estimada</span>
+            <span class="eval-valor" id="calc-cuota-val">—</span>
+          </div>
+          <div class="eval-item">
+            <span class="eval-label">Total a pagar</span>
+            <span class="eval-valor" id="calc-total-val">—</span>
+          </div>
+          <div class="eval-item">
+            <span class="eval-label">Total intereses</span>
+            <span class="eval-valor monto-rojo" id="calc-intereses-val">—</span>
+          </div>
+        </div>
+
+        <div class="form-acciones">
+          <button type="submit" class="btn btn-primary" id="btn-guardar">✓ Solicitar Préstamo</button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarEdicion()" id="btn-cancelar" style="display:none;">✗ Cancelar</button>
+        </div>
+      </form>
+
+      <div id="mensaje" class="mensaje" style="display:none;"></div>
+    </section>
+
+    <!-- TABLA -->
+    <section class="card">
+      <div class="tabla-header">
+        <h2>Préstamos Registrados</h2>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <select id="filtro-estado" onchange="filtrarTabla()" class="filtro-select">
+            <option value="">Todos los estados</option>
+            <option value="solicitado">Solicitado</option>
+            <option value="en_revision">En Revisión</option>
+            <option value="aprobado">Aprobado</option>
+            <option value="rechazado">Rechazado</option>
+            <option value="desembolsado">Desembolsado</option>
+            <option value="pagado">Pagado</option>
+          </select>
+          <div class="busqueda">
+            <input type="text" id="buscar" placeholder="🔍 Buscar socio..." oninput="filtrarTabla()">
+          </div>
+        </div>
+      </div>
+
+      <div class="tabla-container">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Socio</th><th>Monto</th><th>Tasa</th>
+              <th>Plazo</th><th>Fecha</th><th>Estado</th><th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-prestamos">
+            <tr><td colspan="8" class="cargando">Cargando préstamos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tabla-footer"><span id="total-prestamos">Total: 0 registros</span></div>
+    </section>
+
+  </main>
+
+  <!-- MODAL EVALUACIÓN -->
+  <div id="modal-evaluacion" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>📊 Evaluación de Crédito</h3>
+      <p>Préstamo ID: <strong id="eval-id"></strong> &nbsp;|&nbsp; Socio: <strong id="eval-socio"></strong></p>
+      <div id="eval-contenido" class="evaluacion-box" style="margin-top:14px;">
+        <p class="cargando">Calculando...</p>
+      </div>
+      <div id="eval-decision" style="display:none; margin-top:16px; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-aprobar" onclick="tomarDecision('aprobado')">✓ Aprobar</button>
+        <button class="btn btn-rechazar" onclick="tomarDecision('rechazado')">✗ Rechazar</button>
+        <button class="btn btn-secondary" onclick="cerrarModalEval()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL AMORTIZACIÓN -->
+  <div id="modal-amortizacion" class="modal-overlay" style="display:none;">
+    <div class="modal modal-wide">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3>📅 Tabla de Amortización</h3>
+        <button class="btn btn-secondary" onclick="cerrarModalAmort()" style="padding:5px 14px;">✗</button>
+      </div>
+      <p style="margin-bottom:4px;">Préstamo: <strong id="amort-id"></strong> &nbsp;|&nbsp; Socio: <strong id="amort-socio"></strong></p>
+      <p style="margin-bottom:14px; font-size:0.85rem; color:#718096;" id="amort-resumen"></p>
+
+      <div class="tabla-container">
+        <table class="tabla-amort">
+          <thead>
+            <tr>
+              <th>#</th><th>Cuota</th><th>Capital</th><th>Interés</th>
+              <th>Saldo</th><th>Vencimiento</th><th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-amort">
+            <tr><td colspan="7" class="cargando">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;text-align:right;font-size:0.85rem;color:#718096;" id="amort-total"></div>
+    </div>
+  </div>
+
+  <!-- MODAL ELIMINAR -->
+  <div id="modal-eliminar" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>⚠ Confirmar Eliminación</h3>
+      <p>¿Estás seguro de que deseas eliminar el préstamo de <strong id="modal-nombre"></strong>?</p>
+      <p class="modal-aviso">Esta acción eliminará también la tabla de amortización generada.</p>
+      <div class="modal-acciones">
+        <button class="btn btn-danger" onclick="confirmarEliminar()">Sí, Eliminar</button>
+        <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./prestamos.js"></script>
+</body>
+</html>

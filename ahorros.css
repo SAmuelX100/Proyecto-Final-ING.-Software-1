@@ -1,0 +1,36 @@
+/* RESUMEN TARJETAS */
+.resumen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.resumen-card { border-radius: 10px; padding: 20px 24px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.resumen-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.75; }
+.resumen-valor { font-size: 1.6rem; font-weight: 700; }
+.resumen-total   { background: #ebf8ff; color: #2c5282; }
+.resumen-activas { background: #c6f6d5; color: #22543d; }
+.resumen-cerradas{ background: #fed7d7; color: #742a2a; }
+.resumen-count   { background: #e9d8fd; color: #44337a; }
+
+/* FILTROS */
+.filtro-select { padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.88rem; color: #2d3748; background: #fff; cursor: pointer; }
+.filtro-select:focus { outline: none; border-color: #4299e1; box-shadow: 0 0 0 3px rgba(66,153,225,0.15); }
+
+/* BADGES */
+.badge-activa   { background: #c6f6d5; color: #22543d; }
+.badge-inactiva { background: #e2e8f0; color: #4a5568; }
+.badge-cerrada  { background: #fed7d7; color: #742a2a; }
+.badge-deposito { background: #bee3f8; color: #2a4365; }
+.badge-retiro   { background: #fefcbf; color: #744210; }
+
+/* MONTOS */
+.monto       { font-weight: 700; color: #2b6cb0; }
+.monto-verde { color: #22543d; font-weight: 700; }
+.monto-rojo  { color: #742a2a; font-weight: 700; }
+
+/* BOTONES */
+.btn-depositar { background: #68d391; color: #22543d; padding: 5px 10px; font-size: 0.78rem; }
+.btn-depositar:hover { background: #38a169; color: white; }
+.btn-retirar { background: #f6ad55; color: #7b341e; padding: 5px 10px; font-size: 0.78rem; }
+.btn-retirar:hover { background: #dd6b20; color: white; }
+.btn-historial { background: #bee3f8; color: #2a4365; padding: 5px 10px; font-size: 0.78rem; }
+.btn-historial:hover { background: #4299e1; color: white; }
+
+/* MODAL ANCHO */
+.modal-wide { max-width: 700px; }
