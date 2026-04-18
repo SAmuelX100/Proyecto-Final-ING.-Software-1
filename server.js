@@ -42,16 +42,28 @@ app.use('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
     if (req.method === 'PUT') {
-      const updates = Object.keys(req.body).map((key, index) => `"${key}" = $${index + 1}`).join(', ');
-      const values = [...Object.values(req.body), id];
+      // Convertir camelCase → snake_case
+      const snakeCaseData = {};
+      for (let [key, value] of Object.entries(req.body)) {
+        const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+        snakeCaseData[snakeKey] = value;
+      }
+      
+      const updates = Object.keys(snakeCaseData).map((key, index) => `"${key}" = $${index + 1}`).join(', ');
+      const values = [...Object.values(snakeCaseData), id];
+      
+      console.log('UPDATE:', tabla, updates, values); // Debug
+      
       const result = await con.query(`UPDATE "${tabla}" SET ${updates} WHERE id_socio = $${values.length} RETURNING *`, values);
       res.json(result.rows[0] || { mensaje: 'Actualizado' });
+      
     } else if (req.method === 'DELETE') {
       await con.query(`DELETE FROM "${tabla}" WHERE id_socio = $1`, [id]);
+      console.log('DELETE:', tabla, id); // Debug
       res.json({ mensaje: 'Eliminado correctamente' });
     }
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error completo:', error);
     res.status(500).json({ error: error.message });
   }
 });
