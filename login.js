@@ -24,10 +24,10 @@ async function ejecutarLogin(e) {
   btn.textContent = "⌛ Verificando...";
 
   try {
-    // Llamada al método interno de validación
-    const esValido = await validarCredenciales(userInp, passInp);
+    // ⭐️ Ahora esto devuelve el objeto del usuario o null
+    const usuarioValidado = await validarCredenciales(userInp, passInp);
 
-    if (esValido) {
+    if (usuarioValidado) {
       authState.usuario = userInp;
       authState.sesionActiva = true;
       authState.intentosFallidos = 0;
@@ -37,9 +37,10 @@ async function ejecutarLogin(e) {
 
       mostrarMensaje("Acceso concedido. Redirigiendo...", "exito");
       
-      // Persistencia básica para verificarSesion()
+      // ⭐️ AQUÍ ESTÁ LA SOLUCIÓN: Guardamos el ID del usuario
       localStorage.setItem("coop_token", authState.token);
       localStorage.setItem("coop_user", authState.usuario);
+      localStorage.setItem("user_id", usuarioValidado.id_usuario); 
 
       // REDIRECCIÓN AL INDEX (Dashboard Principal)
       setTimeout(() => {
@@ -61,17 +62,18 @@ async function ejecutarLogin(e) {
 
 async function validarCredenciales(u, p) {
   try {
-    // Lee TABLA Usuario (tu CRUD genérico funciona!)
+    // Lee TABLA Usuario
     const res = await fetch("/api/Usuario");
     const usuarios = await res.json();
     
-    // Busca usuario (password_hash = contraseña PLAIN, luego usa bcrypt)
+    // Busca usuario
     const usuario = usuarios.find(x => x.username === u && x.password_hash === p);
     
-    return !!usuario; // true si existe
+    // ⭐️ En lugar de devolver true/false (!!usuario), devolvemos el objeto completo
+    return usuario || null; 
   } catch (err) {
     console.error("Error BD:", err);
-    return false;
+    return null;
   }
 }
 
@@ -128,8 +130,12 @@ function logout() {
   authState.usuario = "";
   authState.token = null;
   authState.sesionActiva = false;
+  
+  // ⭐️ Limpiamos también el ID al cerrar sesión
   localStorage.removeItem("coop_token");
   localStorage.removeItem("coop_user");
+  localStorage.removeItem("user_id"); 
+  
   window.location.href = "./login.html";
 }
 
