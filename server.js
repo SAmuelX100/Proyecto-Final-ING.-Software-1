@@ -6,8 +6,11 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 const con = new Client({
-  host: "localhost", user: "postgres", port: 5433, 
-  password: "samuel1", database: "CooperativaDB"
+  host: "localhost", 
+  user: "postgres", 
+  port: 5433, 
+  password: "samuel1", 
+  database: "CooperativaDB"
 });
 con.connect().then(() => console.log("✅ DB OK"));
 
@@ -20,62 +23,66 @@ function toSnakeCase(obj) {
   return snake;
 }
 
-// ⭐️ GET/POST para CUALQUIER TABLA
-app.use('/api/:tabla', async (req, res) => {
+// ─── RUTAS DE LA API CORREGIDAS ───────────────────────────────────────────────
+
+// GET: Obtener todos los registros
+app.get('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
-    if (req.method === 'POST') {
-      const data = toSnakeCase(req.body);
-      const columns = Object.keys(data).join(', ');
-      const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
-      const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, Object.values(data));
-      res.json(result.rows[0]);
-    } else if (req.method === 'GET') {
-      // ✅ GET individual por query param O lista completa
-      const { id } = req.query;
-      if (id) {
-        // Para Socio usamos id_socio, para otros id_usuario
-        const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
-        const result = await con.query(`SELECT * FROM "${tabla}" WHERE "${pk}" = $1`, [id]);
-        res.json(result.rows[0] || null);
-      } else {
-        const result = await con.query(`SELECT * FROM "${tabla}" ORDER BY "id_socio" DESC NULLS LAST`);
-        res.json(result.rows);
-      }
-    }
+    const result = await con.query(`SELECT * FROM "${tabla}"`);
+    res.json(result.rows);
   } catch (e) {
-    console.error('GET/POST Error:', e.message);
+    console.error('GET Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// ⭐️ PUT/DELETE ESPECÍFICO PARA SOCIO (SIMPLIFICADO Y FUNCIONAL)
-app.use('/api/Socio/:id', async (req, res) => {
-  const { id } = req.params;
+// POST: Crear nuevo registro
+app.post('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
-  
   try {
-    if (req.method === 'PUT') {
-      const data = toSnakeCase(req.body);
-      
-      // ✅ HARDCODE para Socio (más confiable)
-      const setClause = Object.keys(data)
-        .map((key, i) => `"${key}" = $${i + 1}`)
-        .join(', ');
-      
-      const values = [...Object.values(data), id];
-      const query = `UPDATE "Socio" SET ${setClause} WHERE "id_socio" = $${values.length} RETURNING *`;
-      
-      const result = await con.query(query, values);
-      res.json(result.rows[0]);
-      
-    } else if (req.method === 'DELETE') {
-      // ✅ DELETE simple y directo para Socio
-      const result = await con.query('DELETE FROM "Socio" WHERE "id_socio" = $1 RETURNING *', [id]);
-      res.json({ ok: true, deleted: result.rowCount > 0 });
-    }
+    const data = toSnakeCase(req.body);
+    console.log('POST', tabla, data);
+    const columns = Object.keys(data).join(', ');
+    const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
+    const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, Object.values(data));
+    res.json(result.rows[0]);
   } catch (e) {
-    console.error('Socio PUT/DELETE Error:', e.message);
+    console.error('POST Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT: Actualizar registro existente
+app.put('/api/:tabla/:id', async (req, res) => {
+  const { tabla, id } = req.params;
+  try {
+    const data = toSnakeCase(req.body);
+    console.log('PUT', tabla, id, data);
+    
+    // Detectar primary key
+    const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
+    const updates = Object.keys(data).map((k, i) => `"${k}"=$${i+1}`).join(', ');
+    const values = [...Object.values(data), id];
+    
+    const result = await con.query(`UPDATE "${tabla}" SET ${updates} WHERE "${pk}" = $${values.length} RETURNING *`, values);
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('PUT Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE: Eliminar registro
+app.delete('/api/:tabla/:id', async (req, res) => {
+  const { tabla, id } = req.params;
+  try {
+    console.log('DELETE', tabla, id);
+    const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
+    await con.query(`DELETE FROM "${tabla}" WHERE "${pk}" = $1`, [id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

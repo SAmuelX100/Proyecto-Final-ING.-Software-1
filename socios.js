@@ -78,7 +78,7 @@ async function guardarSocio(e) {
     email: document.getElementById("email").value.trim() || null,
     telefono: document.getElementById("telefono").value.trim() || null,
     direccion: document.getElementById("direccion").value.trim() || null,
-    fecha_ingreso: document.getElementById("fechaIngreso").value, // ✅ snake_case consistente
+    fecha_ingreso: document.getElementById("fechaIngreso").value, 
     estado: document.getElementById("estado").value,
   };
 
@@ -128,23 +128,17 @@ async function guardarSocio(e) {
   }
 }
 
-// ─── EDITAR SOCIO (✅ 100% FUNCIONAL) ──────────────────────────────────────────
-async function editarSocio(id) {
+// ─── EDITAR SOCIO (✅ CORREGIDO) ──────────────────────────────────────────────
+function editarSocio(id) {
   try {
-    // ✅ GET individual: /api/Socio?id=123
-    const res = await fetch(`${API_BASE}?id=${id}`);
-    
-    if (!res.ok) {
-      throw new Error("Socio no encontrado");
-    }
-    
-    const socio = await res.json();
+    // Buscar el socio directamente en la lista que ya cargamos en memoria
+    const socio = sociosList.find(s => s.id_socio === id);
     
     if (!socio) {
-      throw new Error("Socio no encontrado en la base de datos");
+      throw new Error("Socio no encontrado en la lista actual");
     }
 
-    // ✅ Cargar datos en formulario (manejo consistente de fechas)
+    // Cargar datos en el formulario
     document.getElementById("socio-id").value = socio.id_socio;
     document.getElementById("nombre").value = socio.nombre || '';
     document.getElementById("apellido").value = socio.apellido || '';
@@ -152,7 +146,7 @@ async function editarSocio(id) {
     document.getElementById("email").value = socio.email || '';
     document.getElementById("telefono").value = socio.telefono || '';
     document.getElementById("direccion").value = socio.direccion || '';
-    document.getElementById("fechaIngreso").value = socio.fecha_ingreso?.split('T')[0] || ''; // ✅ Formato YYYY-MM-DD
+    document.getElementById("fechaIngreso").value = socio.fecha_ingreso?.split('T')[0] || ''; 
     document.getElementById("estado").value = socio.estado || 'activo';
 
     document.getElementById("form-titulo").textContent = `Editar Socio — ${socio.nombre} ${socio.apellido}`;
@@ -171,7 +165,7 @@ function cancelarEdicion() {
   ocultarMensaje();
 }
 
-// ─── ELIMINAR SOCIO (✅ 100% FUNCIONAL) ───────────────────────────────────────
+// ─── ELIMINAR SOCIO ───────────────────────────────────────────────────────────
 function pedirEliminar(id, nombre) {
   idParaEliminar = id;
   document.getElementById("modal-nombre").textContent = nombre;
@@ -187,7 +181,6 @@ async function confirmarEliminar() {
   if (!idParaEliminar) return;
   
   try {
-    // ✅ DELETE: /api/Socio/123
     const res = await fetch(`${API_BASE}/${idParaEliminar}`, { 
       method: "DELETE" 
     });
@@ -236,7 +229,6 @@ function ocultarMensaje() {
 // ─── UTILIDADES ───────────────────────────────────────────────────────────────
 function formatearFecha(fecha) {
   if (!fecha) return '<span style="color:#a0aec0">—</span>';
-  // ✅ Manejo consistente de fechas (YYYY-MM-DD o YYYY-MM-DDTHH:MM:SS)
   const fechaLimpia = fecha.split('T')[0];
   const [anio, mes, dia] = fechaLimpia.split("-");
   return `${dia}/${mes}/${anio}`;
