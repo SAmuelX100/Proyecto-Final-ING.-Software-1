@@ -11,64 +11,60 @@ const con = new Client({
 });
 con.connect().then(() => console.log("✅ DB OK"));
 
-// 🔧 FUNCIÓN snake_case helper
+// Helper snake_case
 function toSnakeCase(obj) {
   const snake = {};
   for (let [key, value] of Object.entries(obj)) {
-    const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-    snake[snakeKey] = value;
+    snake[key.replace(/([A-Z])/g, '_$1').toLowerCase()] = value;
   }
   return snake;
 }
 
-// ⭐️ GET/POST - Cualquier tabla
+// GET/POST cualquier tabla
 app.use('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
     if (req.method === 'POST') {
       const data = toSnakeCase(req.body);
-      console.log('INSERT →', tabla, data);
-      
+      console.log('POST', tabla, data);
       const columns = Object.keys(data).join(', ');
       const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
-      const result = await con.query(
-        `INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, 
-        Object.values(data)
-      );
+      const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, Object.values(data));
       res.json(result.rows[0]);
     } else {
       const result = await con.query(`SELECT * FROM "${tabla}"`);
       res.json(result.rows);
     }
-  } catch (error) {
-    console.error('POST/GET Error:', error.message);
-    res.status(500).json({ error: error.message });
+  } catch (e) {
+    console.error('GET/POST Error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
-// ⭐️ PUT/DELETE - Cualquier tabla/:id
+// ⭐️ PUT/DELETE CORREGIDO (usa id_socio O id_usuario)
 app.use('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
     if (req.method === 'PUT') {
       const data = toSnakeCase(req.body);
-      console.log('UPDATE →', tabla, id, data);
+      console.log('PUT', tabla, id, data);
       
-      const updates = Object.keys(data).map((k, i) => `"${k}" = $${i+1}`).join(', ');
+      // Detectar primary key
+      const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
+      const updates = Object.keys(data).map((k, i) => `"${k}"=$${i+1}`).join(', ');
       const values = [...Object.values(data), id];
-      const result = await con.query(
-        `UPDATE "${tabla}" SET ${updates} WHERE id_socio = $${values.length} RETURNING *`, 
-        values
-      );
-      res.json(result.rows[0] || { ok: true });
+      
+      const result = await con.query(`UPDATE "${tabla}" SET ${updates} WHERE "${pk}" = $${values.length} RETURNING *`, values);
+      res.json(result.rows[0]);
     } else if (req.method === 'DELETE') {
-      console.log('DELETE →', tabla, id);
-      await con.query(`DELETE FROM "${tabla}" WHERE id_socio = $1`, [id]);
+      console.log('DELETE', tabla, id);
+      const pk = tabla === 'Socio' ? 'id_socio' : 'id_usuario';
+      await con.query(`DELETE FROM "${tabla}" WHERE "${pk}" = $1`, [id]);
       res.json({ ok: true });
     }
-  } catch (error) {
-    console.error('PUT/DELETE Error:', error.message);
-    res.status(500).json({ error: error.message });
+  } catch (e) {
+    console.error('PUT/DELETE Error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 

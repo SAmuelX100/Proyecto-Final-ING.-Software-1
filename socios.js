@@ -39,7 +39,7 @@ function renderTabla(lista) {
 
   tbody.innerHTML = lista.map(s => `
     <tr>
-      <td>${s.id}</td>
+      <td>${s.id_socio || s.id}</td>
       <td>${escHtml(s.nombre)} ${escHtml(s.apellido)}</td>
       <td>${escHtml(s.dni)}</td>
       <td>${s.email ? escHtml(s.email) : '<span style="color:#a0aec0">—</span>'}</td>
@@ -49,8 +49,8 @@ function renderTabla(lista) {
       <td><span class="badge badge-${s.estado}">${escHtml(s.estado)}</span></td>
       <td>
         <div class="acciones">
-          <button class="btn btn-editar" onclick="editarSocio(${s.id})">✏ Editar</button>
-          <button class="btn btn-eliminar" onclick="pedirEliminar(${s.id}, '${escAttr(s.nombre)} ${escAttr(s.apellido)}')">🗑 Eliminar</button>
+          <button class="btn btn-editar" onclick="editarSocio(${s.id_socio || s.id})">✏ Editar</button>
+          <button class="btn btn-eliminar" onclick="pedirEliminar(${s.id_socio || s.id}, '${escAttr(s.nombre)} ${escAttr(s.apellido)}')">🗑 Eliminar</button>
         </div>
       </td>
     </tr>
@@ -76,6 +76,7 @@ async function guardarSocio(e) {
 
   const id = document.getElementById("socio-id").value;
   const datos = {
+    id_usuario: parseInt(localStorage.getItem("user_id")) || 1,
     nombre:       document.getElementById("nombre").value.trim(),
     apellido:     document.getElementById("apellido").value.trim(),
     dni:          document.getElementById("dni").value.trim(),
@@ -138,9 +139,9 @@ async function editarSocio(id) {
     if (!res.ok) throw new Error("Socio no encontrado");
     const s = await res.json();
 
-    document.getElementById("socio-id").value      = s.id;
-    document.getElementById("nombre").value         = s.nombre;
-    document.getElementById("apellido").value       = s.apellido;
+    document.getElementById("socio-id").value = s.id_socio || s.id;  
+    document.getElementById("nombre").value = s.nombre || '';
+    document.getElementById("apellido").value = s.apellido || '';
     document.getElementById("dni").value            = s.dni;
     document.getElementById("email").value          = s.email || "";
     document.getElementById("telefono").value       = s.telefono || "";
