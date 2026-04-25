@@ -1,15 +1,20 @@
-const API_BASE   = "/api/aportaciones";
-const API_SOCIOS = "/api/socios";
+const API_BASE   = "/api/Aportacion"; 
+const API_SOCIOS = "/api/Socio";      
 
 let aportacionesList = [];
+let sociosDict       = {}; // ✅ Diccionario para búsqueda rápida de nombres
 let idParaEliminar   = null;
 
-document.addEventListener("DOMContentLoaded", () => {
+// ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", async () => {
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fecha").value = hoy;
-  cargarSociosSelect();
-  cargarAportaciones();
+  await cargarSociosSelect(); // ✅ Cargamos socios primero
+  await cargarAportaciones();
 });
+
+// ─── SOCIOS SELECT ────────────────────────────────────────────────────────────
 
 async function cargarSociosSelect() {
   try {
@@ -17,14 +22,18 @@ async function cargarSociosSelect() {
     if (!res.ok) throw new Error("Error al cargar socios");
     const socios = await res.json();
     const select = document.getElementById("socioId");
+    
     socios.forEach(s => {
+      sociosDict[s.id_socio] = `${s.nombre} ${s.apellido}`; 
       const opt = document.createElement("option");
-      opt.value = s.id;
+      opt.value = s.id_socio; // ✅ BD original
       opt.textContent = `${s.nombre} ${s.apellido} — ${s.dni}`;
       select.appendChild(opt);
     });
   } catch (err) { console.error("Error cargando socios:", err); }
 }
+
+// ─── CARGAR APORTACIONES ──────────────────────────────────────────────────────
 
 async function cargarAportaciones() {
   try {
@@ -41,6 +50,8 @@ async function cargarAportaciones() {
   }
 }
 
+// ─── RESUMEN ──────────────────────────────────────────────────────────────────
+
 function actualizarResumen(lista) {
   const total     = lista.reduce((s, a) => s + Number(a.monto), 0);
   const validadas = lista.filter(a => a.estado === "validada").length;
@@ -51,6 +62,8 @@ function actualizarResumen(lista) {
   document.getElementById("res-count").textContent      = lista.length;
 }
 
+// ─── RENDERIZAR TABLA ─────────────────────────────────────────────────────────
+
 function renderTabla(lista) {
   const tbody = document.getElementById("tbody-aportaciones");
   document.getElementById("total-registros").textContent = `Total: ${lista.length} registro(s)`;
@@ -60,53 +73,75 @@ function renderTabla(lista) {
   }
   tbody.innerHTML = lista.map(a => {
     const yaValidada = a.estado === "validada";
+    const nombreSocio = sociosDict[a.id_socio] || `Socio #${a.id_socio}`; // ✅ Mapeo de nombre
+    
     return `
     <tr>
-      <td>${a.id}</td>
-      <td>${escHtml(a.socioNombre || `Socio #${a.socioId}`)}</td>
+      <td>${a.id_aportacion}</td>
+      <td>${escHtml(nombreSocio)}</td>
       <td><span class="monto">${formatMonto(Number(a.monto))}</span></td>
       <td>${formatearFecha(a.fecha)}</td>
       <td><span class="badge badge-${a.tipo}">${tipoLabel(a.tipo)}</span></td>
       <td><span class="badge badge-${a.estado}">${estadoLabel(a.estado)}</span></td>
       <td>
         <div class="acciones">
-          <button class="btn btn-validar" onclick="validarAportacion(${a.id})" ${yaValidada ? "disabled" : ""}>✓ Validar</button>
-          <button class="btn btn-editar" onclick="editarAportacion(${a.id})">✏ Editar</button>
-          <button class="btn btn-eliminar" onclick="pedirEliminar(${a.id}, '${escAttr(a.socioNombre || "")}')">🗑 Eliminar</button>
+          <button class="btn btn-validar" onclick="validarAportacion(${a.id_aportacion})" ${yaValidada ? "disabled" : ""}>✓ Validar</button>
+          <button class="btn btn-editar" onclick="editarAportacion(${a.id_aportacion})">✏ Editar</button>
+          <button class="btn btn-eliminar" onclick="pedirEliminar(${a.id_aportacion}, '${escAttr(nombreSocio)}')">🗑 Eliminar</button>
         </div>
       </td>
     </tr>`;
   }).join("");
 }
 
+// ─── FILTRAR ──────────────────────────────────────────────────────────────────
+
 function filtrarTabla() {
   const q      = document.getElementById("buscar").value.toLowerCase();
   const tipo   = document.getElementById("filtro-tipo").value;
   const estado = document.getElementById("filtro-estado").value;
   const filtrados = aportacionesList.filter(a => {
-    return (a.socioNombre || "").toLowerCase().includes(q) &&
+    const nombreSocio = sociosDict[a.id_socio] || "";
+    return nombreSocio.toLowerCase().includes(q) &&
            (!tipo   || a.tipo === tipo) &&
            (!estado || a.estado === estado);
   });
   renderTabla(filtrados);
 }
 
+// ─── GUARDAR APORTACIÓN (INCLUYE AUDITORÍA DE VALIDACIÓN) ───────────────────
+
 async function guardarAportacion(e) {
   e.preventDefault();
   const id = document.getElementById("aportacion-id").value;
+  const estadoSeleccionado = document.getElementById("estado").value;
+  
+  // ✅ Mapeo camelCase
   const datos = {
-    socioId: Number(document.getElementById("socioId").value),
-    monto:   Number(document.getElementById("monto").value),
+    idSocio: Number(document.getElementById("socioId").value),
+    monto:   String(Number(document.getElementById("monto").value)),
     fecha:   document.getElementById("fecha").value,
     tipo:    document.getElementById("tipo").value,
-    estado:  document.getElementById("estado").value,
+    estado:  estadoSeleccionado,
   };
-  if (!datos.socioId || !datos.monto || !datos.fecha) {
+
+  // 🔥 Lógica de auditoría: Quién lo validó
+  if (estadoSeleccionado === "validada") {
+    const ap = id ? aportacionesList.find(x => x.id_aportacion == id) : null;
+    datos.validadoPor = (ap && ap.validado_por) 
+        ? ap.validado_por 
+        : Number(localStorage.getItem("user_id"));
+  } else {
+    datos.validadoPor = null;
+  }
+
+  if (!datos.idSocio || !datos.monto || !datos.fecha) {
     mostrarMensaje("Los campos Socio, Monto y Fecha son obligatorios.", "error"); return;
   }
-  if (datos.monto <= 0) {
+  if (Number(datos.monto) <= 0) {
     mostrarMensaje("El monto debe ser mayor a cero.", "error"); return;
   }
+  
   const btn = document.getElementById("btn-guardar");
   btn.disabled = true;
   try {
@@ -117,7 +152,7 @@ async function guardarAportacion(e) {
     });
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al guardar.", "error"); return; }
-    mostrarMensaje(id ? "Aportación actualizada exitosamente." : `Aportación registrada (ID: ${resultado.id}).`, "exito");
+    mostrarMensaje(id ? "Aportación actualizada exitosamente." : `Aportación registrada (ID: ${resultado.id_aportacion}).`, "exito");
     limpiarFormulario();
     await cargarAportaciones();
   } catch (err) {
@@ -125,27 +160,49 @@ async function guardarAportacion(e) {
   } finally { btn.disabled = false; }
 }
 
-async function editarAportacion(id) {
+// ─── EDITAR (DIRECTO DESDE LA MEMORIA) ────────────────────────────────────────
+
+function editarAportacion(id) {
   try {
-    const res = await fetch(`${API_BASE}/${id}`);
-    if (!res.ok) throw new Error("No encontrada");
-    const a = await res.json();
-    document.getElementById("aportacion-id").value = a.id;
-    document.getElementById("socioId").value       = a.socioId;
+    const a = aportacionesList.find(x => x.id_aportacion === id);
+    if (!a) throw new Error("Aportación no encontrada en la lista actual");
+
+    document.getElementById("aportacion-id").value  = a.id_aportacion;
+    document.getElementById("socioId").value        = a.id_socio;
     document.getElementById("monto").value          = Number(a.monto).toFixed(2);
-    document.getElementById("fecha").value          = a.fecha || "";
+    document.getElementById("fecha").value          = a.fecha?.split('T')[0] || ""; // ✅ Quitar hora
     document.getElementById("tipo").value           = a.tipo;
     document.getElementById("estado").value         = a.estado;
-    document.getElementById("form-titulo").textContent = `Editar Aportación #${a.id}`;
+    
+    document.getElementById("form-titulo").textContent = `Editar Aportación #${a.id_aportacion}`;
     document.getElementById("btn-guardar").textContent = "✓ Guardar Cambios";
     document.getElementById("btn-cancelar").style.display = "inline-block";
     document.querySelector(".card").scrollIntoView({ behavior: "smooth" });
   } catch (err) { mostrarMensaje("No se pudo cargar: " + err.message, "error"); }
 }
 
+// ─── VALIDAR RÁPIDO (BOTÓN EN LA TABLA) ───────────────────────────────────────
+
 async function validarAportacion(id) {
   try {
-    const res = await fetch(`${API_BASE}/${id}/validar`, { method: "PUT" });
+    const ap = aportacionesList.find(a => a.id_aportacion === id);
+    
+    // 🔥 Reutilizamos la API genérica en lugar de un endpoint personalizado
+    const datosActualizados = {
+        idSocio: ap.id_socio,
+        monto:   ap.monto,
+        fecha:   ap.fecha?.split('T')[0],
+        tipo:    ap.tipo,
+        estado:  "validada",
+        validadoPor: Number(localStorage.getItem("user_id")) // ID del usuario actual
+    };
+
+    const res = await fetch(`${API_BASE}/${id}`, { 
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datosActualizados)
+    });
+    
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al validar.", "error"); return; }
     mostrarMensaje("Aportación validada exitosamente.", "exito");
@@ -153,7 +210,11 @@ async function validarAportacion(id) {
   } catch (err) { mostrarMensaje("Error de conexión: " + err.message, "error"); }
 }
 
+// ─── CANCELAR EDICIÓN ─────────────────────────────────────────────────────────
+
 function cancelarEdicion() { limpiarFormulario(); ocultarMensaje(); }
+
+// ─── ELIMINAR ─────────────────────────────────────────────────────────────────
 
 function pedirEliminar(id, nombre) {
   idParaEliminar = id;
@@ -168,15 +229,18 @@ function cerrarModal() {
 
 async function confirmarEliminar() {
   if (!idParaEliminar) return;
-  cerrarModal();
+  
   try {
     const res = await fetch(`${API_BASE}/${idParaEliminar}`, { method: "DELETE" });
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al eliminar.", "error"); return; }
     mostrarMensaje("Aportación eliminada exitosamente.", "exito");
+    cerrarModal();
     await cargarAportaciones();
   } catch (err) { mostrarMensaje("Error de conexión: " + err.message, "error"); }
 }
+
+// ─── LIMPIAR FORMULARIO ───────────────────────────────────────────────────────
 
 function limpiarFormulario() {
   document.getElementById("form-aportacion").reset();
@@ -190,6 +254,8 @@ function limpiarFormulario() {
   document.getElementById("estado").value = "pendiente";
 }
 
+// ─── MENSAJES ─────────────────────────────────────────────────────────────────
+
 function mostrarMensaje(texto, tipo) {
   const el = document.getElementById("mensaje");
   el.textContent = texto;
@@ -199,8 +265,15 @@ function mostrarMensaje(texto, tipo) {
 }
 function ocultarMensaje() { document.getElementById("mensaje").style.display = "none"; }
 
+// ─── UTILIDADES ───────────────────────────────────────────────────────────────
+
 function formatMonto(v) { return "RD$ " + Number(v).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function formatearFecha(f) { if (!f) return "—"; const [a,m,d] = f.split("-"); return `${d}/${m}/${a}`; }
+function formatearFecha(f) { 
+  if (!f) return "—"; 
+  const fechaLimpia = f.split('T')[0]; // ✅ Remueve la hora de timestamps
+  const [a,m,d] = fechaLimpia.split("-"); 
+  return `${d}/${m}/${a}`; 
+}
 function tipoLabel(t) { return { cuota_mensual:"Cuota Mensual", aportacion_extraordinaria:"Extraordinaria", ahorro:"Ahorro", prestamo:"Préstamo" }[t] || t; }
 function estadoLabel(e) { return { pendiente:"Pendiente", validada:"Validada", rechazada:"Rechazada" }[e] || e; }
 function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
