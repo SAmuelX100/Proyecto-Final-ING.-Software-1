@@ -74,11 +74,13 @@
             <input type="date" id="fechaPago" required onchange="recalcularMora()">
           </div>
 
+          <!-- 🔥 AQUI ESTÁ EL CAMBIO CLAVE 🔥 -->
           <div class="campo">
-            <label for="estado">Estado del Pago</label>
-            <select id="estado">
-              <option value="completado">Completado</option>
-              <option value="parcial">Parcial</option>
+            <label for="metodo">Método de Pago *</label>
+            <select id="metodo" required>
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia Bancaria</option>
+              <option value="cheque">Cheque</option>
             </select>
           </div>
         </div>
@@ -127,7 +129,7 @@
               <th>Mora</th>
               <th>Total Pagado</th>
               <th>Fecha Pago</th>
-              <th>Estado</th>
+              <th>Método</th> <!-- Cambiado de Estado a Método -->
               <th>Acciones</th>
             </tr>
           </thead>
@@ -155,7 +157,7 @@
         <table>
           <thead>
             <tr>
-              <th>Fecha</th><th>Monto</th><th>Mora</th><th>Total</th><th>Estado</th>
+              <th>Fecha</th><th>Monto</th><th>Mora</th><th>Total</th><th>Método</th> <!-- Cambiado de Estado a Método -->
             </tr>
           </thead>
           <tbody id="tbody-historial-especifico">
