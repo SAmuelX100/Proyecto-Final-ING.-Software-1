@@ -25,9 +25,9 @@ function toSnakeCase(obj) {
   return snake;
 }
 
-// ─── LÓGICA DE NEGOCIO AVANZADA: PRÉSTAMOS Y CUOTAS ───────────────────────────
+// ─── LÓGICA DE NEGOCIO AVANZADA ───────────────────────────────────────────────
 
-// GET: Obtener las cuotas (amortización) de un préstamo específico
+// 1. Obtener las cuotas (amortización) de un préstamo específico
 app.get('/api/Prestamo/:id/amortizacion', async (req, res) => {
   const { id } = req.params;
   try {
@@ -42,7 +42,7 @@ app.get('/api/Prestamo/:id/amortizacion', async (req, res) => {
   }
 });
 
-// POST: Generar tabla de cuotas automáticamente al aprobar préstamo
+// 2. Generar tabla de cuotas automáticamente al aprobar préstamo
 app.post('/api/Prestamo/:id/generar_cuotas', async (req, res) => {
   const { id } = req.params;
   try {
@@ -50,7 +50,6 @@ app.post('/api/Prestamo/:id/generar_cuotas', async (req, res) => {
     if (prestamoRes.rows.length === 0) return res.json({ error: "Préstamo no encontrado" });
     const p = prestamoRes.rows[0];
 
-    // Evitar duplicar cuotas si ya se habían generado
     const countRes = await con.query(`SELECT COUNT(*) FROM "Cuota" WHERE id_prestamo = $1`, [id]);
     if (parseInt(countRes.rows[0].count) > 0) return res.json({ message: "Cuotas ya generadas" });
 
@@ -58,7 +57,6 @@ app.post('/api/Prestamo/:id/generar_cuotas', async (req, res) => {
     const tasaMensual = (parseFloat(p.tasa_interes) / 100) / 12;
     const plazo = parseInt(p.plazo_meses);
 
-    // Fórmula de Amortización Francesa (Cuota Fija)
     let cuotaFija = tasaMensual === 0 ? monto / plazo : (monto * tasaMensual * Math.pow(1 + tasaMensual, plazo)) / (Math.pow(1 + tasaMensual, plazo) - 1);
     
     let saldo = monto;
@@ -67,9 +65,9 @@ app.post('/api/Prestamo/:id/generar_cuotas', async (req, res) => {
     for (let i = 1; i <= plazo; i++) {
         let interes = saldo * tasaMensual;
         let capital = cuotaFija - interes;
-        if (i === plazo) { capital = saldo; cuotaFija = capital + interes; } // Ajuste por decimales en la última cuota
+        if (i === plazo) { capital = saldo; cuotaFija = capital + interes; } 
         saldo -= capital;
-        fecha.setMonth(fecha.getMonth() + 1); // Vence el próximo mes
+        fecha.setMonth(fecha.getMonth() + 1); 
 
         await con.query(
             `INSERT INTO "Cuota" (id_prestamo, numero_cuota, montol_capital, monto_interes, monto_total, fecha_vencimiento, estado)
@@ -83,27 +81,21 @@ app.post('/api/Prestamo/:id/generar_cuotas', async (req, res) => {
   }
 });
 
-// PUT: Interceptar la Validación de Aportaciones para pagar la cuota
+// 3. Interceptar Validación de Aportaciones (Opcional si decides mantenerlo)
 app.put('/api/Aportacion/:id/validar', async (req, res) => {
   const { id } = req.params;
   const { validado_por } = req.body;
   try {
-    // 1. Marcar la aportación como validada
     await con.query(`UPDATE "Aportacion" SET estado = 'validada', validado_por = $1 WHERE id_aportacion = $2`, [validado_por, id]);
 
-    // 2. Revisar si es un abono a préstamo
     const apRes = await con.query(`SELECT * FROM "Aportacion" WHERE id_aportacion = $1`, [id]);
     const ap = apRes.rows[0];
 
     if (ap.tipo === 'abono_prestamo') {
-        // Buscar el préstamo activo del socio
         const prestamoRes = await con.query(`SELECT id_prestamo FROM "Prestamo" WHERE id_socio = $1 AND estado IN ('aprobado', 'desembolsado') ORDER BY id_prestamo ASC LIMIT 1`, [ap.id_socio]);
-        
         if (prestamoRes.rows.length > 0) {
             const idPrestamo = prestamoRes.rows[0].id_prestamo;
-            // Buscar su cuota pendiente más antigua y pagarla
             const cuotaRes = await con.query(`SELECT id_cuota FROM "Cuota" WHERE id_prestamo = $1 AND estado = 'pendiente' ORDER BY numero_cuota ASC LIMIT 1`, [idPrestamo]);
-            
             if (cuotaRes.rows.length > 0) {
                 await con.query(`UPDATE "Cuota" SET estado = 'pagada' WHERE id_cuota = $1`, [cuotaRes.rows[0].id_cuota]);
             }
@@ -115,12 +107,42 @@ app.put('/api/Aportacion/:id/validar', async (req, res) => {
   }
 });
 
+// 🔥 4. Registrar un Pago y actualizar la Cuota automáticamente
+app.post('/api/Pago', async (req, res) => {
+  try {
+    const data = toSnakeCase(req.body);
+    
+    // 1. Insertar el recibo de pago en la tabla Pago
+    const columns = Object.keys(data).join(', ');
+    const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
+    const result = await con.query(
+        `INSERT INTO "Pago" (${columns}) VALUES (${placeholders}) RETURNING *`, 
+        Object.values(data)
+    );
+
+    // 2. Lógica de negocio: Marcar la cuota como pagada
+    if (data.id_cuota) {
+        await con.query(`UPDATE "Cuota" SET estado = 'pagada' WHERE id_cuota = $1`, [data.id_cuota]);
+    }
+
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Error procesando pago:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ─── API REST GENÉRICA (CRUD DINÁMICO) ───────────────────────────────────────
 
 app.get('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
-    const result = await con.query(`SELECT * FROM "${tabla}"`);
+    let extraQuery = "";
+    // Permitimos filtrar pagos por prestamoId enviando ?prestamoId=1
+    if (tabla === 'Pago' && req.query.prestamoId) {
+      extraQuery = ` WHERE id_prestamo = ${parseInt(req.query.prestamoId)}`;
+    }
+    const result = await con.query(`SELECT * FROM "${tabla}"${extraQuery}`);
     res.json(result.rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
