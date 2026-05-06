@@ -301,4 +301,4 @@ app.delete('/api/:tabla/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.listen(3000, () => console.log('🌐 Servidor en http://localhost:3000'));
+app.listen(3000, () => console.log('🌐🚀 Sistema COOPBARAHONA en http://localhost:3000'));
