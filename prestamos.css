@@ -113,3 +113,20 @@
 .tabla-amort th { font-size: 0.78rem; }
 .tabla-amort td { font-size: 0.83rem; }
 .cuota-pagada td { opacity: 0.55; text-decoration: line-through; }
+
+/* 🔥 SOLUCIÓN AL BUG DEL SCROLL PARA PRÉSTAMOS LARGOS 🔥 */
+#modal-amortizacion .tabla-container {
+  max-height: 55vh; /* Limita la altura máxima al 55% de la pantalla */
+  overflow-y: auto; /* Activa la barra de desplazamiento vertical */
+  display: block;   /* Obliga al contenedor a respetar el max-height */
+  border-bottom: 1px solid #e2e8f0; /* Un borde sutil abajo para que se vea limpio */
+}
+
+/* Truco para que los encabezados (N°, Monto, Capital, etc.) se queden fijos al bajar */
+#modal-amortizacion table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #f8fafc;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
