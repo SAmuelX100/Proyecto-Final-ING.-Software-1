@@ -274,7 +274,17 @@ function formatearFecha(f) {
   const [a,m,d] = fechaLimpia.split("-"); 
   return `${d}/${m}/${a}`; 
 }
-function tipoLabel(t) { return { cuota_mensual:"Cuota Mensual", aportacion_extraordinaria:"Extraordinaria", ahorro:"Ahorro", prestamo:"Préstamo" }[t] || t; }
+function tipoLabel(t) { 
+  return { 
+    ordinaria: "Ordinaria", 
+    cuota_mensual: "Cuota Mensual (Ordinaria)", 
+    extraordinaria: "Extraordinaria", 
+    ahorro: "Ahorro (Extraordinaria)", 
+    abono_prestamo: "Abono a Préstamo (Extraordinaria)" 
+  }[t] || t; 
+}
+
+
 function estadoLabel(e) { return { pendiente:"Pendiente", validada:"Validada", rechazada:"Rechazada" }[e] || e; }
 function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function escAttr(s) { return String(s).replace(/'/g,"\\'").replace(/"/g,"&quot;"); }
