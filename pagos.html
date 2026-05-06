@@ -74,7 +74,7 @@
             <input type="date" id="fechaPago" required onchange="recalcularMora()">
           </div>
 
-          <!-- 🔥 AQUI ESTÁ EL CAMBIO CLAVE 🔥 -->
+          <!-- Selector de Método de Pago compatible con tu base de datos -->
           <div class="campo">
             <label for="metodo">Método de Pago *</label>
             <select id="metodo" required>
@@ -125,11 +125,11 @@
             <tr>
               <th>ID</th>
               <th>Préstamo / Socio</th>
-              <th>Monto Cuota</th>
+              <th>Detalle Cuota</th> <!-- Cambiado para mayor claridad -->
               <th>Mora</th>
               <th>Total Pagado</th>
               <th>Fecha Pago</th>
-              <th>Método</th> <!-- Cambiado de Estado a Método -->
+              <th>Método</th> 
               <th>Acciones</th>
             </tr>
           </thead>
@@ -157,7 +157,7 @@
         <table>
           <thead>
             <tr>
-              <th>Fecha</th><th>Monto</th><th>Mora</th><th>Total</th><th>Método</th> <!-- Cambiado de Estado a Método -->
+              <th>Fecha</th><th>Monto</th><th>Mora</th><th>Total</th><th>Método</th> 
             </tr>
           </thead>
           <tbody id="tbody-historial-especifico">

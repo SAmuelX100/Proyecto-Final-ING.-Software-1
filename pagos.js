@@ -27,7 +27,6 @@ async function cargarPrestamosSelect() {
     prestamosActivos.forEach(p => {
       const opt = document.createElement("option");
       opt.value = p.id_prestamo;
-      // Nota: Si quieres ver el nombre del socio aquí, necesitaríamos cruzar datos con la tabla Socio
       opt.textContent = `Préstamo #${p.id_prestamo} — (Monto Original: ${formatMonto(p.monto)})`;
       sel.appendChild(opt);
     });
@@ -130,14 +129,16 @@ async function guardarPago(e) {
   const mora  = Number(document.getElementById("mora").value) || 0;
   const totalPago = monto + mora;
 
-  // Los nombres en camelCase serán transformados a snake_case en el servidor
+  const metodoSeleccionado = document.getElementById("metodo") ? document.getElementById("metodo").value : 'efectivo';
+  const usuarioId = localStorage.getItem("user_id") ? Number(localStorage.getItem("user_id")) : 1;
+
   const datos = {
     idPrestamo: Number(prestamoId),
     idCuota:    Number(cuotaId),
     montoPagado: String(totalPago), 
     fechaPago:  document.getElementById("fechaPago").value,
-    metodo:     document.getElementById("estado") ? document.getElementById("estado").value : 'efectivo', // Ojo aquí con el select de método
-    registradoPor: Number(localStorage.getItem("user_id") || 1)
+    metodo:     metodoSeleccionado, 
+    registradoPor: usuarioId
   };
 
   const btn = document.getElementById("btn-guardar");
@@ -150,20 +151,24 @@ async function guardarPago(e) {
       body: JSON.stringify(datos),
     });
     
-    if (!res.ok) throw new Error("Error al registrar el pago");
+    const resultado = await res.json();
+
+    if (!res.ok) {
+      throw new Error(resultado.error || "Error al registrar el pago en la BD");
+    }
 
     mostrarMensaje("Pago registrado. La cuota ha sido saldada.", "exito");
     limpiarFormulario();
     cargarHistorialPagos();
-    
-    // Recargar el select de cuotas
     cargarCuotasPendientes();
   } catch (err) {
     mostrarMensaje(err.message, "error");
-  } finally { btn.disabled = false; }
+  } finally { 
+    btn.disabled = false; 
+  }
 }
 
-// ─── CARGAR HISTORIAL ─────────────────────────────────────────────────────────
+// ─── CARGAR HISTORIAL Y RENDERIZAR TABLA CON 8 COLUMNAS ───────────────────────
 
 async function cargarHistorialPagos() {
   try {
@@ -195,14 +200,66 @@ function renderTabla(lista) {
   tbody.innerHTML = lista.map(p => {
     return `
     <tr>
+      <!-- 1. ID -->
       <td>${p.id_pago}</td>
+      
+      <!-- 2. Préstamo / Socio -->
       <td><strong>Préstamo #${p.id_prestamo}</strong></td>
+      
+      <!-- 3. Detalle Cuota -->
       <td>Cuota #${p.id_cuota}</td>
-      <td class="total-pagado-celda">${formatMonto(p.monto_pagado)}</td>
+      
+      <!-- 4. Mora -->
+      <td class="monto-rojo">—</td>
+      
+      <!-- 5. Total Pagado -->
+      <td class="total-pagado-celda monto-verde">${formatMonto(p.monto_pagado)}</td>
+      
+      <!-- 6. Fecha Pago -->
       <td>${formatearFecha(p.fecha_pago)}</td>
-      <td><span class="badge badge-pagado">${p.metodo || 'Efectivo'}</span></td>
+      
+      <!-- 7. Método -->
+      <td><span class="badge badge-pagado" style="text-transform: capitalize;">${p.metodo || 'Efectivo'}</span></td>
+      
+      <!-- 8. Acciones -->
+      <td>
+        <div class="acciones">
+          <button class="btn btn-historial" onclick="verHistorialPrestamo(${p.id_prestamo}, 'Socio de Préstamo #${p.id_prestamo}')">
+            &#128203; Ver Historial
+          </button>
+        </div>
+      </td>
     </tr>`;
   }).join("");
+}
+
+// ─── MODAL DE HISTORIAL POR PRÉSTAMO ──────────────────────────────────────────
+
+async function verHistorialPrestamo(prestamoId, socioNombre) {
+  document.getElementById("hist-id").textContent = prestamoId;
+  document.getElementById("hist-socio").textContent = socioNombre;
+  const tbody = document.getElementById("tbody-historial-especifico");
+  tbody.innerHTML = '<tr><td colspan="5" class="cargando">Cargando...</td></tr>';
+  document.getElementById("modal-historial").style.display = "flex";
+
+  try {
+    const res = await fetch(`${API_PAGOS}?prestamoId=${prestamoId}`);
+    const historial = await res.json();
+    
+    tbody.innerHTML = historial.map(h => `
+      <tr>
+        <td>${formatearFecha(h.fecha_pago)}</td>
+        <td>${formatMonto(h.monto_pagado)}</td>
+        <td class="monto-rojo">—</td>
+        <td class="monto monto-verde">${formatMonto(h.monto_pagado)}</td>
+        <td><span class="badge badge-pagado" style="text-transform: capitalize;">${h.metodo || 'Efectivo'}</span></td>
+      </tr>
+    `).join("");
+  } catch (err) { tbody.innerHTML = '<tr><td colspan="5">Error.</td></tr>'; }
+}
+
+function cerrarModalHistorial() {
+  document.getElementById("modal-historial").style.display = "none";
 }
 
 // ─── UTILIDADES ───────────────────────────────────────────────────────────────
@@ -223,10 +280,6 @@ function formatearFecha(f) {
   const fechaLimpia = f.split('T')[0];
   const [a, m, d] = fechaLimpia.split("-");
   return `${d}/${m}/${a}`;
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
 function mostrarMensaje(texto, tipo) {
