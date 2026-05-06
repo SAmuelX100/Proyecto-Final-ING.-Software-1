@@ -18,78 +18,77 @@ con.connect().then(() => console.log("✅ DB OK"));
 function toSnakeCase(obj) {
   const snake = {};
   for (let [key, value] of Object.entries(obj)) {
-    snake[key.replace(/([A-Z])/g, '_$1').toLowerCase()] = value;
+    if (value !== undefined) {
+      snake[key.replace(/([A-Z])/g, '_$1').toLowerCase()] = value;
+    }
   }
   return snake;
 }
 
-// ─── API REST GENÉRICA (VÁLIDA PARA CUALQUIER TABLA) ──────────────────────────
+// ─── ENDPOINTS ESPECÍFICOS DE PRÉSTAMOS ───────────────────────────────────────
 
-// GET: Obtener todos los registros
+// GET: Obtener las cuotas (amortización) de un préstamo específico
+app.get('/api/Prestamo/:id/amortizacion', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await con.query(
+      `SELECT * FROM "Cuota" WHERE id_prestamo = $1 ORDER BY numero_cuota ASC`, 
+      [id]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Error cargando cuotas:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── API REST GENÉRICA ───────────────────────────────────────────────────────
+
 app.get('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
     const result = await con.query(`SELECT * FROM "${tabla}"`);
     res.json(result.rows);
   } catch (e) {
-    console.error('GET Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// POST: Crear nuevo registro
 app.post('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
     const data = toSnakeCase(req.body);
-    console.log(`[POST] /api/${tabla} ->`, data);
-    
     const columns = Object.keys(data).join(', ');
     const placeholders = Object.keys(data).map((_, i) => `$${i+1}`).join(', ');
-    const values = Object.values(data);
-    
-    const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, values);
+    const result = await con.query(`INSERT INTO "${tabla}" (${columns}) VALUES (${placeholders}) RETURNING *`, Object.values(data));
     res.json(result.rows[0]);
   } catch (e) {
-    console.error('POST Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// PUT: Actualizar registro existente
 app.put('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
     const data = toSnakeCase(req.body);
-    console.log(`[PUT] /api/${tabla}/${id} ->`, data);
-    
-    // 🔥 MAGIA: Detectar la llave primaria automáticamente (ej: id_socio, id_prestamo)
+    // Identificación dinámica de la Primary Key
     const pk = `id_${tabla.toLowerCase()}`; 
-    
     const updates = Object.keys(data).map((k, i) => `"${k}"=$${i+1}`).join(', ');
     const values = [...Object.values(data), id];
-    
     const result = await con.query(`UPDATE "${tabla}" SET ${updates} WHERE "${pk}" = $${values.length} RETURNING *`, values);
     res.json(result.rows[0]);
   } catch (e) {
-    console.error('PUT Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// DELETE: Eliminar registro
 app.delete('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
-    console.log(`[DELETE] /api/${tabla}/${id}`);
-    
-    // 🔥 MAGIA: Identificar llave primaria automáticamente
     const pk = `id_${tabla.toLowerCase()}`; 
-    
     await con.query(`DELETE FROM "${tabla}" WHERE "${pk}" = $1`, [id]);
     res.json({ ok: true });
   } catch (e) {
-    console.error('DELETE Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

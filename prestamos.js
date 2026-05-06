@@ -5,9 +5,6 @@ let prestamosList  = [];
 let sociosDict     = {}; 
 let idParaEliminar = null;
 let evalPrestamoId = null;
-let evalSocioNombre= null;
-
-// ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", async () => {
   const hoy = new Date().toISOString().split("T")[0];
@@ -16,14 +13,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   await cargarPrestamos();
 });
 
-// ─── SOCIOS SELECT ────────────────────────────────────────────────────────────
-
 async function cargarSociosSelect() {
   try {
     const res = await fetch(API_SOCIOS);
     const socios = await res.json();
     const sel = document.getElementById("socioId");
-    
     socios.forEach(s => {
       sociosDict[s.id_socio] = `${s.nombre} ${s.apellido}`; 
       const opt = document.createElement("option");
@@ -33,8 +27,6 @@ async function cargarSociosSelect() {
     });
   } catch (err) { console.error("Error cargando socios:", err); }
 }
-
-// ─── CALCULADORA DE CUOTA ─────────────────────────────────────────────────────
 
 function calcularCuota() {
   const monto = Number(document.getElementById("monto").value);
@@ -61,24 +53,15 @@ function calcularCuota() {
   document.getElementById("calc-intereses-val").textContent = formatMonto(totalInteres);
 }
 
-// ─── CARGAR PRÉSTAMOS ─────────────────────────────────────────────────────────
-
 async function cargarPrestamos() {
   try {
     const res = await fetch(API_BASE);
-    if (!res.ok) throw new Error("Error al cargar");
     prestamosList = await res.json();
     actualizarResumen(prestamosList);
     renderTabla(prestamosList);
     document.getElementById("resumen-grid").style.display = "grid";
-  } catch (err) {
-    mostrarMensaje("Error al conectar con el servidor: " + err.message, "error");
-    document.getElementById("tbody-prestamos").innerHTML =
-      '<tr><td colspan="8" class="cargando">No se pudieron cargar los datos.</td></tr>';
-  }
+  } catch (err) { mostrarMensaje("Error al cargar datos", "error"); }
 }
-
-// ─── RESUMEN ──────────────────────────────────────────────────────────────────
 
 function actualizarResumen(lista) {
   const montoTotal  = lista.reduce((s, p) => s + Number(p.monto), 0);
@@ -90,24 +73,17 @@ function actualizarResumen(lista) {
   document.getElementById("res-count").textContent       = lista.length;
 }
 
-// ─── RENDERIZAR TABLA ─────────────────────────────────────────────────────────
-
 function renderTabla(lista) {
   const tbody = document.getElementById("tbody-prestamos");
   document.getElementById("total-prestamos").textContent = `Total: ${lista.length} registro(s)`;
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="cargando">No hay préstamos registrados.</td></tr>';
-    return;
-  }
   tbody.innerHTML = lista.map(p => {
     const aprobable = ["solicitado", "en_revision"].includes(p.estado);
-    const nombreSocio = sociosDict[p.id_socio] || `Socio #${p.id_socio}`; 
-    
+    const nombreSocio = sociosDict[p.id_socio] || `Socio #${p.id_socio}`;
     return `
     <tr>
       <td>${p.id_prestamo}</td>
       <td>${escHtml(nombreSocio)}</td>
-      <td><span class="monto">${formatMonto(Number(p.monto))}</span></td>
+      <td>${formatMonto(p.monto)}</td>
       <td>${Number(p.tasa_interes).toFixed(2)}%</td>
       <td>${p.plazo_meses} meses</td>
       <td>${formatearFecha(p.fecha_solicitud)}</td>
@@ -120,15 +96,13 @@ function renderTabla(lista) {
           <button class="btn btn-amortizacion" onclick="verAmortizacion(${p.id_prestamo},'${escAttr(nombreSocio)}',${Number(p.monto)},${Number(p.tasa_interes)},${p.plazo_meses})">
             &#128197; Cuotas
           </button>
-          <button class="btn btn-editar" onclick="editarPrestamo(${p.id_prestamo})">&#9998; Editar</button>
-          <button class="btn btn-eliminar" onclick="pedirEliminar(${p.id_prestamo},'${escAttr(nombreSocio)}')">&#128465; Eliminar</button>
+          <button class="btn btn-editar" onclick="editarPrestamo(${p.id_prestamo})">✏ Editar</button>
+          <button class="btn btn-eliminar" onclick="pedirEliminar(${p.id_prestamo}, '${escAttr(nombreSocio)}')">🗑 Eliminar</button>
         </div>
       </td>
     </tr>`;
   }).join("");
 }
-
-// ─── FILTRAR ──────────────────────────────────────────────────────────────────
 
 function filtrarTabla() {
   const q      = document.getElementById("buscar").value.toLowerCase();
@@ -142,119 +116,73 @@ function filtrarTabla() {
   renderTabla(filtrados);
 }
 
-// ─── GUARDAR PRÉSTAMO (CON FECHA Y USUARIO DE APROBACIÓN) ─────────────────────
-
 async function guardarPrestamo(e) {
   e.preventDefault();
   const id = document.getElementById("prestamo-id").value;
   const estadoSeleccionado = document.getElementById("estado").value;
   
   const datos = {
-    idSocio:        Number(document.getElementById("socioId").value), 
-    monto:          String(Number(document.getElementById("monto").value)),
-    tasaInteres:    String(Number(document.getElementById("tasaInteres").value)), 
-    plazoMeses:     Number(document.getElementById("plazo").value), 
+    idSocio: Number(document.getElementById("socioId").value), 
+    monto: document.getElementById("monto").value,
+    tasaInteres: document.getElementById("tasaInteres").value, 
+    plazoMeses: Number(document.getElementById("plazo").value), 
     fechaSolicitud: document.getElementById("fechaSolicitud").value, 
-    estado:         estadoSeleccionado,
+    estado: estadoSeleccionado,
   };
 
-  // 🔥 Lógica de auditoría para aprobación manual
-  const estadosAprobados = ["aprobado", "desembolsado", "pagado"];
-  
-  if (estadosAprobados.includes(estadoSeleccionado)) {
-    const p = id ? prestamosList.find(x => x.id_prestamo == id) : null;
-    
-    datos.fechaAprobacion = (p && p.fecha_aprobacion) 
-        ? p.fecha_aprobacion.split('T')[0] 
-        : new Date().toISOString().split("T")[0];
-    
-    datos.aprobadoPor = (p && p.aprobado_por) 
-        ? p.aprobado_por 
-        : Number(localStorage.getItem("user_id"));
+  // Auditoría automática de aprobación
+  if (["aprobado", "desembolsado"].includes(estadoSeleccionado)) {
+    const pExistente = id ? prestamosList.find(x => x.id_prestamo == id) : null;
+    datos.fechaAprobacion = (pExistente && pExistente.fecha_aprobacion) 
+      ? pExistente.fecha_aprobacion.split('T')[0] 
+      : new Date().toISOString().split("T")[0];
+    datos.aprobadoPor = (pExistente && pExistente.aprobado_por) 
+      ? pExistente.aprobado_por 
+      : Number(localStorage.getItem("user_id"));
   } else {
     datos.fechaAprobacion = null;
     datos.aprobadoPor = null;
   }
 
-  if (!datos.idSocio || !datos.monto || !datos.plazoMeses || !datos.fechaSolicitud) {
-    mostrarMensaje("Socio, Monto, Plazo y Fecha son obligatorios.", "error"); return;
-  }
-  if (Number(datos.monto) <= 0) { mostrarMensaje("El monto debe ser mayor a cero.", "error"); return; }
-  if (datos.plazoMeses < 1) { mostrarMensaje("El plazo debe ser al menos 1 mes.", "error"); return; }
-
-  const btn = document.getElementById("btn-guardar");
-  btn.disabled = true;
   try {
     const res = await fetch(id ? `${API_BASE}/${id}` : API_BASE, {
       method: id ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datos),
     });
-    const resultado = await res.json();
-    if (!res.ok) { mostrarMensaje(resultado.error || "Error al guardar.", "error"); return; }
-    mostrarMensaje(id ? "Préstamo actualizado exitosamente." : `Préstamo registrado (ID: ${resultado.id_prestamo}).`, "exito");
-    limpiarFormulario();
-    await cargarPrestamos();
-  } catch (err) {
-    mostrarMensaje("Error de conexión: " + err.message, "error");
-  } finally { btn.disabled = false; }
+    if (res.ok) {
+      mostrarMensaje("Operación exitosa", "exito");
+      limpiarFormulario();
+      await cargarPrestamos();
+    }
+  } catch (err) { mostrarMensaje("Error de conexión", "error"); }
 }
-
-// ─── EDITAR ───────────────────────────────────────────────────────────────────
 
 function editarPrestamo(id) {
-  try {
-    const p = prestamosList.find(x => x.id_prestamo === id);
-    if (!p) throw new Error("Préstamo no encontrado en la lista actual");
+  const p = prestamosList.find(x => x.id_prestamo === id);
+  if (!p) return;
 
-    document.getElementById("prestamo-id").value       = p.id_prestamo;
-    document.getElementById("socioId").value           = p.id_socio;
-    document.getElementById("monto").value             = Number(p.monto).toFixed(2);
-    document.getElementById("tasaInteres").value       = Number(p.tasa_interes).toFixed(2);
-    document.getElementById("plazo").value             = p.plazo_meses;
-    document.getElementById("fechaSolicitud").value    = p.fecha_solicitud?.split('T')[0] || "";
-    document.getElementById("estado").value            = p.estado;
-    
-    document.getElementById("form-titulo").textContent = `Editar Préstamo #${p.id_prestamo}`;
-    document.getElementById("btn-guardar").textContent = "✓ Guardar Cambios";
-    document.getElementById("btn-cancelar").style.display = "inline-block";
-    calcularCuota();
-    document.querySelector(".card").scrollIntoView({ behavior: "smooth" });
-  } catch (err) { mostrarMensaje("No se pudo cargar: " + err.message, "error"); }
+  document.getElementById("prestamo-id").value = p.id_prestamo;
+  document.getElementById("socioId").value = p.id_socio;
+  document.getElementById("monto").value = Number(p.monto).toFixed(2);
+  document.getElementById("tasaInteres").value = Number(p.tasa_interes).toFixed(2);
+  document.getElementById("plazo").value = p.plazo_meses;
+  document.getElementById("fechaSolicitud").value = p.fecha_solicitud?.split('T')[0];
+  document.getElementById("estado").value = p.estado;
+  
+  document.getElementById("form-titulo").textContent = `Editar Préstamo #${p.id_prestamo}`;
+  document.getElementById("btn-guardar").textContent = "✓ Guardar Cambios";
+  document.getElementById("btn-cancelar").style.display = "inline-block";
+  calcularCuota();
+  document.querySelector(".card").scrollIntoView({ behavior: "smooth" });
 }
-
-// ─── MODAL EVALUACIÓN Y DECISIÓN (CON FECHA Y USUARIO) ────────────────────────
 
 async function abrirModalEval(id, socioNombre) {
   evalPrestamoId  = id;
-  evalSocioNombre = socioNombre;
   document.getElementById("eval-id").textContent    = id;
   document.getElementById("eval-socio").textContent = socioNombre;
-  document.getElementById("eval-contenido").innerHTML = '<p class="cargando">Calculando evaluación...</p>';
-  document.getElementById("eval-decision").style.display = "none";
+  document.getElementById("eval-contenido").innerHTML = '<p class="cargando">Este endpoint no está disponible en la API genérica.</p>';
   document.getElementById("modal-evaluacion").style.display = "flex";
-
-  try {
-    const res = await fetch(`${API_BASE}/${id}/evaluar`);
-    const ev  = await res.json();
-    if (!res.ok) { document.getElementById("eval-contenido").innerHTML = `<p>${ev.error}</p>`; return; }
-
-    const colorRec = ev.recomendacion === "APROBAR" ? "eval-aprobado"
-                   : ev.recomendacion === "REVISAR" ? "eval-revisar" : "eval-rechazar";
-    document.getElementById("eval-contenido").innerHTML = `
-      <div class="eval-item"><span class="eval-label">Monto solicitado</span><span class="eval-valor">${formatMonto(ev.monto)}</span></div>
-      <div class="eval-item"><span class="eval-label">Tasa de interés</span><span class="eval-valor">${Number(ev.tasa).toFixed(2)}% anual</span></div>
-      <div class="eval-item"><span class="eval-label">Plazo</span><span class="eval-valor">${ev.plazo} meses</span></div>
-      <div class="eval-item"><span class="eval-label">Cuota mensual</span><span class="eval-valor">${formatMonto(ev.cuotaMensual)}</span></div>
-      <div class="eval-item"><span class="eval-label">Puntaje crediticio</span><span class="eval-valor">${ev.puntos} / 100</span></div>
-      <div class="eval-item"><span class="eval-label">Recomendación</span><span class="eval-valor ${colorRec}">${ev.recomendacion}</span></div>
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:10px 0;">
-      ${ev.observaciones.map(o => `<div style="font-size:0.82rem;color:#718096;padding:3px 0;">• ${escHtml(o)}</div>`).join("")}
-    `;
-    document.getElementById("eval-decision").style.display = "flex";
-  } catch (err) {
-    document.getElementById("eval-contenido").innerHTML = '<p>Error al evaluar. Asegúrate de tener este endpoint configurado en el backend.</p>';
-  }
 }
 
 function cerrarModalEval() {
@@ -262,90 +190,58 @@ function cerrarModalEval() {
   document.getElementById("modal-evaluacion").style.display = "none";
 }
 
-async function tomarDecision(decision) {
-  if (!evalPrestamoId) return;
-  try {
-    const prestamo = prestamosList.find(p => p.id_prestamo === evalPrestamoId);
-    
-    // 🔥 Reutilizamos tu API genérica para actualizar el estado
-    const datosActualizados = {
-        idSocio:        prestamo.id_socio,
-        monto:          prestamo.monto,
-        tasaInteres:    prestamo.tasa_interes,
-        plazoMeses:     prestamo.plazo_meses,
-        fechaSolicitud: prestamo.fecha_solicitud?.split('T')[0],
-        estado:         decision === "aprobado" ? "aprobado" : "rechazado",
-    };
-
-    // Si aprueba, inyectamos fecha y usuario
-    if (decision === "aprobado") {
-        datosActualizados.fechaAprobacion = new Date().toISOString().split("T")[0];
-        datosActualizados.aprobadoPor = Number(localStorage.getItem("user_id"));
-    } else {
-        datosActualizados.fechaAprobacion = null;
-        datosActualizados.aprobadoPor = null;
-    }
-
-    const res = await fetch(`${API_BASE}/${evalPrestamoId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosActualizados),
-    });
-    
-    const resultado = await res.json();
-    if (!res.ok) { mostrarMensaje(resultado.error || "Error.", "error"); return; }
-    
-    cerrarModalEval();
-    mostrarMensaje(
-      `Préstamo ${decision === "aprobado" ? "aprobado" : "rechazado"} exitosamente.`, "exito"
-    );
-    await cargarPrestamos();
-  } catch (err) { 
-    mostrarMensaje("Error de conexión.", "error"); 
-  }
-}
-
-// ─── MODAL AMORTIZACIÓN ───────────────────────────────────────────────────────
+// ─── MODAL AMORTIZACIÓN (CONECTADO A LA TABLA CUOTA) ──────────────────────────
 
 async function verAmortizacion(id, socioNombre, monto, tasa, plazo) {
   document.getElementById("amort-id").textContent    = id;
   document.getElementById("amort-socio").textContent = socioNombre;
   document.getElementById("amort-resumen").textContent =
     `${formatMonto(monto)} · ${Number(tasa).toFixed(2)}% anual · ${plazo} meses`;
-  document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Cargando...</td></tr>';
+  document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Cargando cuotas...</td></tr>';
   document.getElementById("amort-total").textContent = "";
   document.getElementById("modal-amortizacion").style.display = "flex";
 
   try {
     const res    = await fetch(`${API_BASE}/${id}/amortizacion`);
     const cuotas = await res.json();
+    
     if (!cuotas.length) {
-      document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Sin cuotas generadas.</td></tr>';
+      document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">No hay cuotas generadas para este préstamo.</td></tr>';
       return;
     }
+
     let totalCuota = 0, totalCapital = 0, totalInteres = 0;
+    
     document.getElementById("tbody-amort").innerHTML = cuotas.map(c => {
-      const mc = Number(c.montoCuota), cap = Number(c.capital), int = Number(c.interes);
+      // Mapeando las columnas EXACTAS de tu tabla PostgreSQL
+      const mc   = Number(c.monto_total);
+      const cap  = Number(c.montol_capital); // Nota: Usando el typo de tu DB
+      const int  = Number(c.monto_interes);
+      const mora = Number(c.mora_acumulada);
+      
       totalCuota += mc; totalCapital += cap; totalInteres += int;
+      
       return `
       <tr class="${c.estado === "pagada" ? "cuota-pagada" : ""}">
-        <td>${c.numeroCuota}</td>
+        <td>${c.numero_cuota}</td>
         <td>${formatMonto(mc)}</td>
         <td class="monto-verde">+${formatMonto(cap)}</td>
         <td class="monto-rojo">+${formatMonto(int)}</td>
-        <td><span class="monto">${formatMonto(Number(c.saldo))}</span></td>
-        <td>${formatearFecha(c.fechaVencimiento)}</td>
+        <!-- Reemplazamos 'Saldo' por 'Mora' para reflejar tu BD -->
+        <td><span class="${mora > 0 ? 'monto-rojo' : ''}">${formatMonto(mora)}</span></td>
+        <td>${formatearFecha(c.fecha_vencimiento)}</td>
         <td><span class="badge badge-${c.estado || "pendiente"}">${
           c.estado === "pagada" ? "Pagada" : c.estado === "vencida" ? "Vencida" : "Pendiente"
         }</span></td>
       </tr>`;
     }).join("");
+
     document.getElementById("amort-total").innerHTML =
       `Total cuotas: <strong>${formatMonto(totalCuota)}</strong> &nbsp;|&nbsp; ` +
       `Capital: <span class="monto-verde">${formatMonto(totalCapital)}</span> &nbsp;|&nbsp; ` +
       `Intereses: <span class="monto-rojo">${formatMonto(totalInteres)}</span>`;
   } catch (err) {
-    document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Error al cargar. Asegúrate de tener este endpoint en el backend.</td></tr>';
+    document.getElementById("tbody-amort").innerHTML = '<tr><td colspan="7" class="cargando">Error al conectar con la base de datos.</td></tr>';
   }
 }
 
@@ -353,11 +249,7 @@ function cerrarModalAmort() {
   document.getElementById("modal-amortizacion").style.display = "none";
 }
 
-// ─── CANCELAR EDICIÓN ─────────────────────────────────────────────────────────
-
 function cancelarEdicion() { limpiarFormulario(); ocultarMensaje(); }
-
-// ─── ELIMINAR ─────────────────────────────────────────────────────────────────
 
 function pedirEliminar(id, nombre) {
   idParaEliminar = id;
@@ -372,18 +264,15 @@ function cerrarModal() {
 
 async function confirmarEliminar() {
   if (!idParaEliminar) return;
-  
   try {
     const res = await fetch(`${API_BASE}/${idParaEliminar}`, { method: "DELETE" });
-    const resultado = await res.json();
-    if (!res.ok) { mostrarMensaje(resultado.error || "Error al eliminar.", "error"); return; }
-    mostrarMensaje("Préstamo eliminado exitosamente.", "exito");
-    cerrarModal();
-    await cargarPrestamos();
-  } catch (err) { mostrarMensaje("Error de conexión: " + err.message, "error"); }
+    if (res.ok) {
+      mostrarMensaje("Préstamo eliminado exitosamente.", "exito");
+      cerrarModal();
+      await cargarPrestamos();
+    }
+  } catch (err) { mostrarMensaje("Error de conexión", "error"); }
 }
-
-// ─── LIMPIAR FORMULARIO ───────────────────────────────────────────────────────
 
 function limpiarFormulario() {
   document.getElementById("form-prestamo").reset();
@@ -397,8 +286,6 @@ function limpiarFormulario() {
   document.getElementById("estado").value = "solicitado";
 }
 
-// ─── MENSAJES ─────────────────────────────────────────────────────────────────
-
 function mostrarMensaje(texto, tipo) {
   const el = document.getElementById("mensaje");
   el.textContent = texto;
@@ -406,26 +293,14 @@ function mostrarMensaje(texto, tipo) {
   el.style.display = "block";
   setTimeout(ocultarMensaje, 5000);
 }
+
 function ocultarMensaje() { document.getElementById("mensaje").style.display = "none"; }
-
-// ─── UTILIDADES ───────────────────────────────────────────────────────────────
-
-function formatMonto(v) {
-  return "RD$ " + Number(v).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatMonto(v) { return "RD$ " + Number(v).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function formatearFecha(f) { 
+  if (!f) return '<span style="color:#a0aec0">—</span>'; 
+  const [a, m, d] = f.split('T')[0].split("-"); 
+  return `${d}/${m}/${a}`; 
 }
-function formatearFecha(f) {
-  if (!f) return '<span style="color:#a0aec0">—</span>';
-  const fechaLimpia = f.split('T')[0];
-  const [a, m, d] = fechaLimpia.split("-");
-  return `${d}/${m}/${a}`;
-}
-function estadoLabel(e) {
-  return {
-    solicitado:"Solicitado", en_revision:"En Revisión", aprobado:"Aprobado",
-    rechazado:"Rechazado", desembolsado:"Desembolsado", pagado:"Pagado"
-  }[e] || e;
-}
-function escHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
+function estadoLabel(e) { return { solicitado:"Solicitado", en_revision:"En Revisión", aprobado:"Aprobado", rechazado:"Rechazado", desembolsado:"Desembolsado", pagado:"Pagado" }[e] || e; }
+function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function escAttr(s) { return String(s).replace(/'/g,"\\'").replace(/"/g,"&quot;"); }
