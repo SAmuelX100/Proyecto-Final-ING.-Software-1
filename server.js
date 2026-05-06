@@ -25,7 +25,7 @@ function toSnakeCase(obj) {
   return snake;
 }
 
-// ─── ENDPOINTS ESPECÍFICOS DE PRÉSTAMOS ───────────────────────────────────────
+// ─── LÓGICA DE NEGOCIO AVANZADA: PRÉSTAMOS Y CUOTAS ───────────────────────────
 
 // GET: Obtener las cuotas (amortización) de un préstamo específico
 app.get('/api/Prestamo/:id/amortizacion', async (req, res) => {
@@ -42,7 +42,80 @@ app.get('/api/Prestamo/:id/amortizacion', async (req, res) => {
   }
 });
 
-// ─── API REST GENÉRICA ───────────────────────────────────────────────────────
+// POST: Generar tabla de cuotas automáticamente al aprobar préstamo
+app.post('/api/Prestamo/:id/generar_cuotas', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const prestamoRes = await con.query(`SELECT * FROM "Prestamo" WHERE id_prestamo = $1`, [id]);
+    if (prestamoRes.rows.length === 0) return res.json({ error: "Préstamo no encontrado" });
+    const p = prestamoRes.rows[0];
+
+    // Evitar duplicar cuotas si ya se habían generado
+    const countRes = await con.query(`SELECT COUNT(*) FROM "Cuota" WHERE id_prestamo = $1`, [id]);
+    if (parseInt(countRes.rows[0].count) > 0) return res.json({ message: "Cuotas ya generadas" });
+
+    const monto = parseFloat(p.monto);
+    const tasaMensual = (parseFloat(p.tasa_interes) / 100) / 12;
+    const plazo = parseInt(p.plazo_meses);
+
+    // Fórmula de Amortización Francesa (Cuota Fija)
+    let cuotaFija = tasaMensual === 0 ? monto / plazo : (monto * tasaMensual * Math.pow(1 + tasaMensual, plazo)) / (Math.pow(1 + tasaMensual, plazo) - 1);
+    
+    let saldo = monto;
+    let fecha = new Date(p.fecha_aprobacion || new Date());
+
+    for (let i = 1; i <= plazo; i++) {
+        let interes = saldo * tasaMensual;
+        let capital = cuotaFija - interes;
+        if (i === plazo) { capital = saldo; cuotaFija = capital + interes; } // Ajuste por decimales en la última cuota
+        saldo -= capital;
+        fecha.setMonth(fecha.getMonth() + 1); // Vence el próximo mes
+
+        await con.query(
+            `INSERT INTO "Cuota" (id_prestamo, numero_cuota, montol_capital, monto_interes, monto_total, fecha_vencimiento, estado)
+             VALUES ($1, $2, $3, $4, $5, $6, 'pendiente')`,
+            [id, i, capital, interes, cuotaFija, fecha.toISOString().split('T')[0]]
+        );
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT: Interceptar la Validación de Aportaciones para pagar la cuota
+app.put('/api/Aportacion/:id/validar', async (req, res) => {
+  const { id } = req.params;
+  const { validado_por } = req.body;
+  try {
+    // 1. Marcar la aportación como validada
+    await con.query(`UPDATE "Aportacion" SET estado = 'validada', validado_por = $1 WHERE id_aportacion = $2`, [validado_por, id]);
+
+    // 2. Revisar si es un abono a préstamo
+    const apRes = await con.query(`SELECT * FROM "Aportacion" WHERE id_aportacion = $1`, [id]);
+    const ap = apRes.rows[0];
+
+    if (ap.tipo === 'abono_prestamo') {
+        // Buscar el préstamo activo del socio
+        const prestamoRes = await con.query(`SELECT id_prestamo FROM "Prestamo" WHERE id_socio = $1 AND estado IN ('aprobado', 'desembolsado') ORDER BY id_prestamo ASC LIMIT 1`, [ap.id_socio]);
+        
+        if (prestamoRes.rows.length > 0) {
+            const idPrestamo = prestamoRes.rows[0].id_prestamo;
+            // Buscar su cuota pendiente más antigua y pagarla
+            const cuotaRes = await con.query(`SELECT id_cuota FROM "Cuota" WHERE id_prestamo = $1 AND estado = 'pendiente' ORDER BY numero_cuota ASC LIMIT 1`, [idPrestamo]);
+            
+            if (cuotaRes.rows.length > 0) {
+                await con.query(`UPDATE "Cuota" SET estado = 'pagada' WHERE id_cuota = $1`, [cuotaRes.rows[0].id_cuota]);
+            }
+        }
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── API REST GENÉRICA (CRUD DINÁMICO) ───────────────────────────────────────
 
 app.get('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
@@ -71,7 +144,6 @@ app.put('/api/:tabla/:id', async (req, res) => {
   const { tabla, id } = req.params;
   try {
     const data = toSnakeCase(req.body);
-    // Identificación dinámica de la Primary Key
     const pk = `id_${tabla.toLowerCase()}`; 
     const updates = Object.keys(data).map((k, i) => `"${k}"=$${i+1}`).join(', ');
     const values = [...Object.values(data), id];
@@ -93,4 +165,4 @@ app.delete('/api/:tabla/:id', async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log('🌐 Servidor corriendo en http://localhost:3000'));
+app.listen(3000, () => console.log('🌐 Servidor en http://localhost:3000'));

@@ -2,7 +2,7 @@ const API_BASE   = "/api/Aportacion";
 const API_SOCIOS = "/api/Socio";      
 
 let aportacionesList = [];
-let sociosDict       = {}; // ✅ Diccionario para búsqueda rápida de nombres
+let sociosDict       = {}; 
 let idParaEliminar   = null;
 
 // ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
@@ -10,7 +10,7 @@ let idParaEliminar   = null;
 document.addEventListener("DOMContentLoaded", async () => {
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fecha").value = hoy;
-  await cargarSociosSelect(); // ✅ Cargamos socios primero
+  await cargarSociosSelect(); 
   await cargarAportaciones();
 });
 
@@ -26,7 +26,7 @@ async function cargarSociosSelect() {
     socios.forEach(s => {
       sociosDict[s.id_socio] = `${s.nombre} ${s.apellido}`; 
       const opt = document.createElement("option");
-      opt.value = s.id_socio; // ✅ BD original
+      opt.value = s.id_socio; 
       opt.textContent = `${s.nombre} ${s.apellido} — ${s.dni}`;
       select.appendChild(opt);
     });
@@ -73,7 +73,7 @@ function renderTabla(lista) {
   }
   tbody.innerHTML = lista.map(a => {
     const yaValidada = a.estado === "validada";
-    const nombreSocio = sociosDict[a.id_socio] || `Socio #${a.id_socio}`; // ✅ Mapeo de nombre
+    const nombreSocio = sociosDict[a.id_socio] || `Socio #${a.id_socio}`; 
     
     return `
     <tr>
@@ -109,14 +109,13 @@ function filtrarTabla() {
   renderTabla(filtrados);
 }
 
-// ─── GUARDAR APORTACIÓN (INCLUYE AUDITORÍA DE VALIDACIÓN) ───────────────────
+// ─── GUARDAR APORTACIÓN ───────────────────────────────────────────────────────
 
 async function guardarAportacion(e) {
   e.preventDefault();
   const id = document.getElementById("aportacion-id").value;
   const estadoSeleccionado = document.getElementById("estado").value;
   
-  // ✅ Mapeo camelCase
   const datos = {
     idSocio: Number(document.getElementById("socioId").value),
     monto:   String(Number(document.getElementById("monto").value)),
@@ -125,7 +124,6 @@ async function guardarAportacion(e) {
     estado:  estadoSeleccionado,
   };
 
-  // 🔥 Lógica de auditoría: Quién lo validó
   if (estadoSeleccionado === "validada") {
     const ap = id ? aportacionesList.find(x => x.id_aportacion == id) : null;
     datos.validadoPor = (ap && ap.validado_por) 
@@ -160,7 +158,7 @@ async function guardarAportacion(e) {
   } finally { btn.disabled = false; }
 }
 
-// ─── EDITAR (DIRECTO DESDE LA MEMORIA) ────────────────────────────────────────
+// ─── EDITAR ───────────────────────────────────────────────────────────────────
 
 function editarAportacion(id) {
   try {
@@ -170,7 +168,7 @@ function editarAportacion(id) {
     document.getElementById("aportacion-id").value  = a.id_aportacion;
     document.getElementById("socioId").value        = a.id_socio;
     document.getElementById("monto").value          = Number(a.monto).toFixed(2);
-    document.getElementById("fecha").value          = a.fecha?.split('T')[0] || ""; // ✅ Quitar hora
+    document.getElementById("fecha").value          = a.fecha?.split('T')[0] || ""; 
     document.getElementById("tipo").value           = a.tipo;
     document.getElementById("estado").value         = a.estado;
     
@@ -181,33 +179,26 @@ function editarAportacion(id) {
   } catch (err) { mostrarMensaje("No se pudo cargar: " + err.message, "error"); }
 }
 
-// ─── VALIDAR RÁPIDO (BOTÓN EN LA TABLA) ───────────────────────────────────────
+// ─── VALIDAR RÁPIDO (Y PAGAR CUOTA SI APLICA) ─────────────────────────────────
 
 async function validarAportacion(id) {
   try {
-    const ap = aportacionesList.find(a => a.id_aportacion === id);
+    const body = { validado_por: Number(localStorage.getItem("user_id")) };
     
-    // 🔥 Reutilizamos la API genérica en lugar de un endpoint personalizado
-    const datosActualizados = {
-        idSocio: ap.id_socio,
-        monto:   ap.monto,
-        fecha:   ap.fecha?.split('T')[0],
-        tipo:    ap.tipo,
-        estado:  "validada",
-        validadoPor: Number(localStorage.getItem("user_id")) // ID del usuario actual
-    };
-
-    const res = await fetch(`${API_BASE}/${id}`, { 
+    const res = await fetch(`${API_BASE}/${id}/validar`, { 
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosActualizados)
+      body: JSON.stringify(body)
     });
     
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al validar.", "error"); return; }
-    mostrarMensaje("Aportación validada exitosamente.", "exito");
+    
+    mostrarMensaje("Aportación validada. Si era un abono, la cuota se descontó automáticamente.", "exito");
     await cargarAportaciones();
-  } catch (err) { mostrarMensaje("Error de conexión: " + err.message, "error"); }
+  } catch (err) { 
+    mostrarMensaje("Error de conexión: " + err.message, "error"); 
+  }
 }
 
 // ─── CANCELAR EDICIÓN ─────────────────────────────────────────────────────────
@@ -270,7 +261,7 @@ function ocultarMensaje() { document.getElementById("mensaje").style.display = "
 function formatMonto(v) { return "RD$ " + Number(v).toLocaleString("es-DO", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function formatearFecha(f) { 
   if (!f) return "—"; 
-  const fechaLimpia = f.split('T')[0]; // ✅ Remueve la hora de timestamps
+  const fechaLimpia = f.split('T')[0]; 
   const [a,m,d] = fechaLimpia.split("-"); 
   return `${d}/${m}/${a}`; 
 }
@@ -283,8 +274,6 @@ function tipoLabel(t) {
     abono_prestamo: "Abono a Préstamo (Extraordinaria)" 
   }[t] || t; 
 }
-
-
 function estadoLabel(e) { return { pendiente:"Pendiente", validada:"Validada", rechazada:"Rechazada" }[e] || e; }
 function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function escAttr(s) { return String(s).replace(/'/g,"\\'").replace(/"/g,"&quot;"); }
