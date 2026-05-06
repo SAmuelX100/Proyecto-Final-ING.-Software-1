@@ -17,20 +17,37 @@ document.addEventListener("DOMContentLoaded", () => {
   
   document.getElementById("fechaInicio").value = primero;
   document.getElementById("fechaFin").value = ultimo;
+  
   cargarEstadisticas(); 
 });
+
+// ─── OBTENER ESTADÍSTICAS DEL SERVIDOR ────────────────────────────────────────
+async function cargarEstadisticas() {
+  try {
+    const res = await fetch(`${API_REPORTES}/estadisticas`);
+    if (!res.ok) throw new Error("No se pudieron cargar estadísticas");
+    
+    estadisticas = await res.json();
+    actualizarCardsEstadisticas();
+  } catch (err) {
+    console.warn("Trabajando sin estadísticas:", err);
+  }
+}
 
 // ─── GENERAR REPORTE (Lógica principal) ───────────────────────────────────────
 
 async function generarReporte(e) {
   e.preventDefault();
   
+  // Obtenemos el usuario activo (Auditoría), si no hay asume ID 1
+  const usuarioId = localStorage.getItem("user_id") ? parseInt(localStorage.getItem("user_id")) : 1;
+
   const filtros = {
     tipo: document.getElementById("tipo").value,
     fechaInicio: document.getElementById("fechaInicio").value,
     fechaFin: document.getElementById("fechaFin").value,
     formato: document.getElementById("formato").value,
-    generadoPor: parseInt(document.getElementById("generadoPor").value) || null
+    generadoPor: usuarioId
   };
 
   const btn = document.getElementById("btn-generar");
@@ -38,32 +55,36 @@ async function generarReporte(e) {
   btn.textContent = "⌛ Generando...";
 
   try {
-    // ⭐️ NUEVO: 1. GUARDAR en tabla Reporte
+    // 1. GUARDAR registro de reporte en la BD (Historial/Auditoría)
     const resReporte = await fetch(API_REPORTES, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(filtros)
     });
+    
     const reporteGuardado = await resReporte.json();
+    if (reporteGuardado.error) throw new Error(reporteGuardado.error);
 
-    // ⭐️ MODIFICADO: 2. OBTENER datos
+    // 2. OBTENER los datos reales desde la BD filtrados por fecha
     const resDatos = await fetch(`${API_REPORTES}?tipo=${filtros.tipo}&inicio=${filtros.fechaInicio}&fin=${filtros.fechaFin}`);
     if (!resDatos.ok) throw new Error("Error al obtener datos");
     
     const data = await resDatos.json();
     datosReporteActual = { ...filtros, data, idReporte: reporteGuardado.id_reporte };
 
-    // ⭐️ MODIFICADO: resto igual pero con ID
+    // 3. DECISIÓN: Mostrar en pantalla o procesar descarga
     if (filtros.formato === "pantalla") {
       renderizarVistaPrevia(filtros, data);
+      mostrarMensaje("✅ Reporte generado exitosamente!", "exito");
     } else if (filtros.formato === "pdf") {
-      exportarPDF(reporteGuardado.id_reporte);  // ← Nuevo parámetro
+      exportarPDF(reporteGuardado.id_reporte);  
     } else {
-      exportarExcel(reporteGuardado.id_reporte); // ← Nuevo parámetro
+      exportarExcel(reporteGuardado.id_reporte); 
     }
 
-    actualizarEstadisticas(filtros.tipo);
-    mostrarMensaje("✅ Guardado en BD!", "exito");
+    // Actualizamos visuales
+    document.getElementById("res-ultimo-tipo").textContent = filtros.tipo.charAt(0).toUpperCase() + filtros.tipo.slice(1);
+    cargarEstadisticas(); // Traemos las estadisticas frescas
 
   } catch (err) {
     mostrarMensaje("Error: " + err.message, "error");
@@ -91,9 +112,9 @@ function renderizarVistaPrevia(filtros, data) {
   if (filtros.tipo === "socios") {
     columnas = ["ID", "Nombre Completo", "DNI", "Email", "Fecha Ingreso", "Estado"];
   } else if (filtros.tipo === "prestamos") {
-    columnas = ["ID", "Socio", "Monto", "Plazo", "Tasa", "Estado", "Saldo Pendiente"];
+    columnas = ["ID", "ID Socio", "Monto", "Plazo", "Tasa", "Estado", "Saldo Pendiente"];
   } else if (filtros.tipo === "aportaciones") {
-    columnas = ["ID", "Socio", "Monto", "Fecha", "Tipo", "Estado"];
+    columnas = ["ID", "ID Socio", "Monto", "Fecha", "Tipo", "Estado"];
   } else {
     columnas = ["Concepto", "Ingresos", "Egresos", "Balance"];
   }
@@ -101,12 +122,13 @@ function renderizarVistaPrevia(filtros, data) {
   // Renderizar Cabecera
   thead.innerHTML = `<tr>${columnas.map(col => `<th>${col}</th>`).join("")}</tr>`;
 
-  // Renderizar Cuerpo (Simulado con los datos recibidos)
+  // Renderizar Cuerpo
   if (!data || data.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${columnas.length}" class="cargando">No se encontraron registros en este rango.</td></tr>`;
     return;
   }
 
+  // Mapear dinámicamente los valores que vienen de la Base de Datos
   tbody.innerHTML = data.map(item => `
     <tr>
       ${Object.values(item).map(val => `<td>${formatSiEsNumero(val)}</td>`).join("")}
@@ -114,37 +136,23 @@ function renderizarVistaPrevia(filtros, data) {
   `).join("");
 }
 
-// ─── EXPORTACIÓN (exportarPDF / exportarExcel) ────────────────────────────────
+// ─── EXPORTACIÓN ──────────────────────────────────────────────────────────────
 
-function exportarPDF() {
+function exportarPDF(idReporte) {
   if (!datosReporteActual) return;
-  estadisticas.pdf++;
-  actualizarCardsEstadisticas();
-  
-  // Simulación de descarga
-  mostrarMensaje("Iniciando descarga de PDF...", "exito");
-  console.log("Exportando a PDF:", datosReporteActual);
-  // Aquí iría la lógica con jsPDF o similar
+  mostrarMensaje(`PDF #${idReporte} generado. Iniciando descarga...`, "exito");
+  console.log("Exportando a PDF (Datos de la BD):", datosReporteActual);
+  // Aquí iría tu librería (ej. jsPDF) usando datosReporteActual.data
 }
 
-function exportarExcel() {
+function exportarExcel(idReporte) {
   if (!datosReporteActual) return;
-  estadisticas.excel++;
-  actualizarCardsEstadisticas();
-  
-  // Simulación de descarga
-  mostrarMensaje("Iniciando descarga de Excel...", "exito");
-  console.log("Exportando a Excel:", datosReporteActual);
-  // Aquí iría la lógica con SheetJS o similar
+  mostrarMensaje(`Excel #${idReporte} generado. Iniciando descarga...`, "exito");
+  console.log("Exportando a Excel (Datos de la BD):", datosReporteActual);
+  // Aquí iría tu librería (ej. SheetJS) usando datosReporteActual.data
 }
 
 // ─── UTILIDADES ───────────────────────────────────────────────────────────────
-
-function actualizarEstadisticas(tipo) {
-  estadisticas.generados++;
-  document.getElementById("res-ultimo-tipo").textContent = tipo.charAt(0).toUpperCase() + tipo.slice(1);
-  actualizarCardsEstadisticas();
-}
 
 function actualizarCardsEstadisticas() {
   document.getElementById("res-total-gen").textContent = estadisticas.generados;
@@ -155,11 +163,18 @@ function actualizarCardsEstadisticas() {
 function limpiarFiltros() {
   document.getElementById("form-reporte").reset();
   document.getElementById("seccion-vista-previa").style.display = "none";
+  
+  const ahora = new Date();
+  const primero = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split("T")[0];
+  const ultimo  = ahora.toISOString().split("T")[0];
+  document.getElementById("fechaInicio").value = primero;
+  document.getElementById("fechaFin").value = ultimo;
 }
 
 function formatSiEsNumero(val) {
+  // Ignorar formateo monetario para IDs o números de cédula
   if (typeof val === 'number') {
-    if (val > 1000) return "RD$ " + val.toLocaleString("es-DO", { minimumFractionDigits: 2 });
+    if (val > 1000 && val % 1 !== 0) return "RD$ " + val.toLocaleString("es-DO", { minimumFractionDigits: 2 });
     return val;
   }
   return val;
@@ -167,7 +182,9 @@ function formatSiEsNumero(val) {
 
 function formatearFecha(f) {
   if (!f) return "—";
-  const [a, m, d] = f.split("-");
+  // Evitar error si viene como ISO Timestamp desde PostgreSQL
+  const fechaLimpia = f.split('T')[0];
+  const [a, m, d] = fechaLimpia.split("-");
   return `${d}/${m}/${a}`;
 }
 
@@ -177,31 +194,4 @@ function mostrarMensaje(texto, tipo) {
   el.className = `mensaje ${tipo}`;
   el.style.display = "block";
   setTimeout(() => el.style.display = "none", 4000);
-}
-
-// AGREGAR ESTAS 2 FUNCIONES (al final del archivo)
-async function cargarEstadisticas() {
-  try {
-    const res = await fetch(`${API_REPORTES}/estadisticas`);
-    estadisticas = await res.json();
-    actualizarCardsEstadisticas();
-  } catch (err) {
-    console.warn("Sin estadísticas");
-  }
-}
-
-function exportarPDF(idReporte) {  // ← Recibe ID
-  if (!datosReporteActual) return;
-  estadisticas.pdf++;
-  actualizarCardsEstadisticas();
-  mostrarMensaje(`PDF #${idReporte} listo!`, "exito");
-  console.log("PDF ID:", idReporte);
-}
-
-function exportarExcel(idReporte) { // ← Recibe ID
-  if (!datosReporteActual) return;
-  estadisticas.excel++;
-  actualizarCardsEstadisticas();
-  mostrarMensaje(`Excel #${idReporte} listo!`, "exito");
-  console.log("Excel ID:", idReporte);
 }

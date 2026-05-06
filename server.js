@@ -14,7 +14,7 @@ const con = new Client({
 });
 con.connect().then(() => console.log("✅ DB OK"));
 
-// Helper: Convierte camelCase a snake_case para PostgreSQL
+// Helper: Convierte camelCase a snake_case
 function toSnakeCase(obj) {
   const snake = {};
   for (let [key, value] of Object.entries(obj)) {
@@ -25,19 +25,74 @@ function toSnakeCase(obj) {
   return snake;
 }
 
-// ─── LÓGICA DE NEGOCIO AVANZADA: AHORROS ──────────────────────────────────────
+// ─── LÓGICA DE NEGOCIO AVANZADA: REPORTES ─────────────────────────────────────
 
+// 1. Obtener estadísticas (Para las tarjetas de arriba)
+app.get('/api/Reporte/estadisticas', async (req, res) => {
+  try {
+    const total = await con.query(`SELECT COUNT(*) FROM "Reporte"`);
+    const pdf = await con.query(`SELECT COUNT(*) FROM "Reporte" WHERE formato = 'pdf'`);
+    const excel = await con.query(`SELECT COUNT(*) FROM "Reporte" WHERE formato = 'excel'`);
+    
+    res.json({
+      generados: parseInt(total.rows[0].count),
+      pdf: parseInt(pdf.rows[0].count),
+      excel: parseInt(excel.rows[0].count)
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 2. Obtener datos reales del reporte (filtro por fechas) o consultar la tabla Reporte
+app.get('/api/Reporte', async (req, res) => {
+  const { tipo, inicio, fin } = req.query;
+  
+  // Si no hay query 'tipo', actúa como CRUD genérico (devuelve el historial de reportes)
+  if (!tipo) {
+    try {
+      const result = await con.query(`SELECT * FROM "Reporte" ORDER BY fecha_generacion DESC`);
+      return res.json(result.rows);
+    } catch (e) { return res.status(500).json({ error: e.message }); }
+  }
+
+  // Si hay query 'tipo', consultamos la tabla correspondiente para llenar la vista previa
+  try {
+    let result = { rows: [] };
+    if (tipo === 'socios') {
+      result = await con.query(`SELECT id_socio, nombre || ' ' || apellido AS nombre_completo, dni, email, fecha_ingreso, estado FROM "Socio" WHERE fecha_ingreso BETWEEN $1 AND $2`, [inicio, fin]);
+    } else if (tipo === 'prestamos') {
+      result = await con.query(`SELECT id_prestamo, id_socio, monto, plazo_meses, tasa_interes, estado, monto AS saldo_pendiente FROM "Prestamo" WHERE fecha_solicitud BETWEEN $1 AND $2`, [inicio, fin]);
+    } else if (tipo === 'aportaciones') {
+      result = await con.query(`SELECT id_aportacion, id_socio, monto, fecha, tipo, estado FROM "Aportacion" WHERE fecha BETWEEN $1 AND $2`, [inicio, fin]);
+    }
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 3. Registrar un nuevo Reporte en BD
+app.post('/api/Reporte', async (req, res) => {
+  const { tipo, fechaInicio, fechaFin, formato, generadoPor } = req.body;
+  try {
+    // Inserta y devuelve el ID generado por la secuencia
+    const result = await con.query(
+      `INSERT INTO "Reporte" (tipo, fecha_inicio, fecha_fin, formato, generado_por, fecha_generacion) 
+       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+      [tipo, fechaInicio, fechaFin, formato, generadoPor || 1]
+    );
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error("Error guardando reporte:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+// ─── LÓGICA DE NEGOCIO AVANZADA: AHORROS ──────────────────────────────────────
 app.get('/api/Cuenta_ahorro/:id/movimientos', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await con.query(
-      `SELECT * FROM "Movimiento_ahorro" WHERE id_cuenta = $1 ORDER BY fecha DESC`, 
-      [id]
-    );
+    const result = await con.query(`SELECT * FROM "Movimiento_ahorro" WHERE id_cuenta = $1 ORDER BY fecha DESC`, [id]);
     res.json(result.rows);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/Cuenta_ahorro/:id/deposito', async (req, res) => {
@@ -56,12 +111,8 @@ app.post('/api/Cuenta_ahorro/:id/deposito', async (req, res) => {
        VALUES ($1, 'deposito', $2::numeric, NOW(), $3::numeric, $4::numeric, $5)`,
       [id, montoNum, saldoAnterior, saldoPosterior, descripcion || 'Depósito en caja']
     );
-
     res.json({ ok: true, saldo: saldoPosterior });
-  } catch (e) {
-    console.error("Error en depósito:", e.message);
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/Cuenta_ahorro/:id/retiro', async (req, res) => {
@@ -74,9 +125,7 @@ app.post('/api/Cuenta_ahorro/:id/retiro', async (req, res) => {
     const saldoAnterior = parseFloat(cuentaRes.rows[0].saldo);
     const montoNum = parseFloat(monto);
 
-    if (saldoAnterior < montoNum) {
-      return res.status(400).json({ error: "Fondos insuficientes para este retiro." });
-    }
+    if (saldoAnterior < montoNum) return res.status(400).json({ error: "Fondos insuficientes." });
 
     const saldoPosterior = saldoAnterior - montoNum;
 
@@ -85,18 +134,12 @@ app.post('/api/Cuenta_ahorro/:id/retiro', async (req, res) => {
        VALUES ($1, 'retiro', $2::numeric, NOW(), $3::numeric, $4::numeric, $5)`,
       [id, montoNum, saldoAnterior, saldoPosterior, descripcion || 'Retiro en caja']
     );
-
     res.json({ ok: true, saldo: saldoPosterior });
-  } catch (e) {
-    console.error("Error en retiro:", e.message);
-    res.status(500).json({ error: e.message });
-  }
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 
 // ─── LÓGICA DE NEGOCIO AVANZADA: PRÉSTAMOS Y PAGOS ────────────────────────────
-
-// 🔥 NUEVO FIX: Evaluar la viabilidad crediticia de un préstamo
 app.get('/api/Prestamo/:id/evaluar', async (req, res) => {
   const { id } = req.params;
   try {
@@ -108,51 +151,20 @@ app.get('/api/Prestamo/:id/evaluar', async (req, res) => {
     const tasa = parseFloat(p.tasa_interes);
     const plazo = parseInt(p.plazo_meses);
 
-    // Calcular cuota mensual fija para mostrarla
     const tasaMensual = (tasa / 100) / 12;
-    let cuota = 0;
-    if (tasaMensual === 0) {
-      cuota = monto / plazo;
-    } else {
-      cuota = (monto * tasaMensual * Math.pow(1 + tasaMensual, plazo)) / (Math.pow(1 + tasaMensual, plazo) - 1);
-    }
+    let cuota = tasaMensual === 0 ? monto / plazo : (monto * tasaMensual * Math.pow(1 + tasaMensual, plazo)) / (Math.pow(1 + tasaMensual, plazo) - 1);
 
-    // Análisis de Puntos Crediticios Ficticios (Reglas de negocio)
     let puntos = 100; 
-    const observaciones = ["Socio verificado en el sistema central."];
+    const observaciones = ["Socio verificado."];
 
-    if (monto > 100000) {
-      puntos -= 20;
-      observaciones.push("Monto muy elevado. Requiere revisión especial del comité.");
-    } else if (monto > 50000) {
-      puntos -= 10;
-      observaciones.push("Monto moderado-alto. Revisar capacidad de pago.");
-    } else {
-      observaciones.push("Monto dentro del umbral de aprobación automática.");
-    }
+    if (monto > 100000) { puntos -= 20; observaciones.push("Monto elevado. Requiere aprobación del comité."); } 
+    else if (monto > 50000) { puntos -= 10; observaciones.push("Monto moderado-alto."); }
+    if (plazo > 24) { puntos -= 15; observaciones.push("Plazo extendido."); }
 
-    if (plazo > 24) {
-      puntos -= 15;
-      observaciones.push("Plazo superior a 24 meses. Mayor exposición de capital.");
-    }
+    let recomendacion = puntos < 70 ? "RECHAZAR" : puntos <= 85 ? "REVISAR" : "APROBAR";
 
-    let recomendacion = "APROBAR";
-    if (puntos < 70) recomendacion = "RECHAZAR";
-    else if (puntos <= 85) recomendacion = "REVISAR";
-
-    res.json({
-      monto: monto,
-      tasa: tasa,
-      plazo: plazo,
-      cuotaMensual: cuota,
-      puntos: puntos,
-      recomendacion: recomendacion,
-      observaciones: observaciones
-    });
-  } catch (e) {
-    console.error("Error en evaluación de préstamo:", e.message);
-    res.status(500).json({ error: e.message });
-  }
+    res.json({ monto, tasa, plazo, cuotaMensual: cuota, puntos, recomendacion, observaciones });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/Prestamo/:id/amortizacion', async (req, res) => {
@@ -213,14 +225,11 @@ app.post('/api/Pago', async (req, res) => {
 });
 
 // ─── API REST GENÉRICA (CRUD DINÁMICO) ───────────────────────────────────────
-
 app.get('/api/:tabla', async (req, res) => {
   const { tabla } = req.params;
   try {
     let extraQuery = "";
-    if (tabla === 'Pago' && req.query.prestamoId) {
-      extraQuery = ` WHERE id_prestamo = ${parseInt(req.query.prestamoId)}`;
-    }
+    if (tabla === 'Pago' && req.query.prestamoId) extraQuery = ` WHERE id_prestamo = ${parseInt(req.query.prestamoId)}`;
     const result = await con.query(`SELECT * FROM "${tabla}"${extraQuery}`);
     res.json(result.rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
