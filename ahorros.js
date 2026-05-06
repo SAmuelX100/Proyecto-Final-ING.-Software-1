@@ -1,18 +1,19 @@
-const API_BASE   = "/api/ahorros";
-const API_SOCIOS = "/api/socios";
+const API_BASE   = "/api/Cuenta_ahorro";
+const API_SOCIOS = "/api/Socio";
 
 let cuentasList    = [];
+let sociosDict     = {}; 
 let idParaEliminar = null;
 let txCuentaId     = null;
 let txTipo         = null;
 
 // ─── INICIALIZACIÓN ───────────────────────────────────────────────────────────
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fechaApertura").value = hoy;
-  cargarSociosSelect();
-  cargarCuentas();
+  await cargarSociosSelect();
+  await cargarCuentas();
 });
 
 // ─── SOCIOS SELECT ────────────────────────────────────────────────────────────
@@ -23,8 +24,9 @@ async function cargarSociosSelect() {
     const socios = await res.json();
     const sel = document.getElementById("socioId");
     socios.forEach(s => {
+      sociosDict[s.id_socio] = `${s.nombre} ${s.apellido}`; 
       const opt = document.createElement("option");
-      opt.value = s.id;
+      opt.value = s.id_socio;
       opt.textContent = `${s.nombre} ${s.apellido} — ${s.dni}`;
       sel.appendChild(opt);
     });
@@ -73,27 +75,29 @@ function renderTabla(lista) {
 
   tbody.innerHTML = lista.map(c => {
     const activa = c.estado === "activa";
+    const nombreSocio = sociosDict[c.id_socio] || `Socio #${c.id_socio}`;
+
     return `
     <tr>
-      <td>${c.id}</td>
-      <td>${escHtml(c.socioNombre || `Socio #${c.socioId}`)}</td>
-      <td><strong>${escHtml(c.numeroCuenta)}</strong></td>
+      <td>${c.id_cuenta}</td>
+      <td>${escHtml(nombreSocio)}</td>
+      <td><strong>${escHtml(c.numero_cuenta)}</strong></td>
       <td><span class="monto">${formatMonto(Number(c.saldo))}</span></td>
-      <td>${formatearFecha(c.fechaApertura)}</td>
+      <td>${formatearFecha(c.fecha_apertura)}</td>
       <td><span class="badge badge-${c.estado}">${estadoLabel(c.estado)}</span></td>
       <td>
         <div class="acciones">
-          <button class="btn btn-depositar" onclick="abrirModalTx(${c.id},'deposito','${escAttr(c.numeroCuenta)}',${Number(c.saldo)})" ${!activa ? "disabled" : ""}>
+          <button class="btn btn-depositar" onclick="abrirModalTx(${c.id_cuenta},'deposito','${escAttr(c.numero_cuenta)}',${Number(c.saldo)})" ${!activa ? "disabled" : ""}>
             &#8679; Depositar
           </button>
-          <button class="btn btn-retirar" onclick="abrirModalTx(${c.id},'retiro','${escAttr(c.numeroCuenta)}',${Number(c.saldo)})" ${!activa ? "disabled" : ""}>
+          <button class="btn btn-retirar" onclick="abrirModalTx(${c.id_cuenta},'retiro','${escAttr(c.numero_cuenta)}',${Number(c.saldo)})" ${!activa ? "disabled" : ""}>
             &#8681; Retirar
           </button>
-          <button class="btn btn-historial" onclick="verHistorial(${c.id},'${escAttr(c.numeroCuenta)}','${escAttr(c.socioNombre || "")}')">
-            &#128203; Historial
+          <button class="btn btn-historial" onclick="verHistorial(${c.id_cuenta},'${escAttr(c.numero_cuenta)}','${escAttr(nombreSocio)}')">
+            &#128203; Movimientos
           </button>
-          <button class="btn btn-editar" onclick="editarCuenta(${c.id})">&#9998; Editar</button>
-          <button class="btn btn-eliminar" onclick="pedirEliminar(${c.id},'${escAttr(c.numeroCuenta)}')">&#128465; Eliminar</button>
+          <button class="btn btn-editar" onclick="editarCuenta(${c.id_cuenta})">&#9998; Editar</button>
+          <button class="btn btn-eliminar" onclick="pedirEliminar(${c.id_cuenta},'${escAttr(c.numero_cuenta)}')">&#128465; Eliminar</button>
         </div>
       </td>
     </tr>`;
@@ -105,10 +109,10 @@ function renderTabla(lista) {
 function filtrarTabla() {
   const q      = document.getElementById("buscar").value.toLowerCase();
   const estado = document.getElementById("filtro-estado").value;
-  const filtrados = cuentasList.filter(c =>
-    (c.socioNombre || "").toLowerCase().includes(q) ||
-    c.numeroCuenta.toLowerCase().includes(q)
-  ).filter(c => !estado || c.estado === estado);
+  const filtrados = cuentasList.filter(c => {
+    const nombreSocio = sociosDict[c.id_socio] || "";
+    return nombreSocio.toLowerCase().includes(q) || c.numero_cuenta.toLowerCase().includes(q);
+  }).filter(c => !estado || c.estado === estado);
   renderTabla(filtrados);
 }
 
@@ -118,13 +122,13 @@ async function guardarCuenta(e) {
   e.preventDefault();
   const id = document.getElementById("ahorro-id").value;
   const datos = {
-    socioId:       Number(document.getElementById("socioId").value),
+    idSocio:       Number(document.getElementById("socioId").value),
     numeroCuenta:  document.getElementById("numeroCuenta").value.trim(),
     saldo:         String(Number(document.getElementById("saldo").value) || 0),
     fechaApertura: document.getElementById("fechaApertura").value,
     estado:        document.getElementById("estado").value,
   };
-  if (!datos.socioId || !datos.numeroCuenta || !datos.fechaApertura) {
+  if (!datos.idSocio || !datos.numeroCuenta || !datos.fechaApertura) {
     mostrarMensaje("Socio, Número de Cuenta y Fecha son obligatorios.", "error"); return;
   }
   const btn = document.getElementById("btn-guardar");
@@ -137,7 +141,7 @@ async function guardarCuenta(e) {
     });
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al guardar.", "error"); return; }
-    mostrarMensaje(id ? "Cuenta actualizada exitosamente." : `Cuenta abierta exitosamente (ID: ${resultado.id}).`, "exito");
+    mostrarMensaje(id ? "Cuenta actualizada exitosamente." : `Cuenta abierta exitosamente (ID: ${resultado.id_cuenta}).`, "exito");
     limpiarFormulario();
     await cargarCuentas();
   } catch (err) {
@@ -147,18 +151,18 @@ async function guardarCuenta(e) {
 
 // ─── EDITAR ───────────────────────────────────────────────────────────────────
 
-async function editarCuenta(id) {
+function editarCuenta(id) {
   try {
-    const res = await fetch(`${API_BASE}/${id}`);
-    if (!res.ok) throw new Error("Cuenta no encontrada");
-    const c = await res.json();
-    document.getElementById("ahorro-id").value         = c.id;
-    document.getElementById("socioId").value           = c.socioId;
-    document.getElementById("numeroCuenta").value      = c.numeroCuenta;
+    const c = cuentasList.find(x => x.id_cuenta === id);
+    if (!c) throw new Error("Cuenta no encontrada");
+
+    document.getElementById("ahorro-id").value         = c.id_cuenta;
+    document.getElementById("socioId").value           = c.id_socio;
+    document.getElementById("numeroCuenta").value      = c.numero_cuenta;
     document.getElementById("saldo").value             = Number(c.saldo).toFixed(2);
-    document.getElementById("fechaApertura").value     = c.fechaApertura || "";
+    document.getElementById("fechaApertura").value     = c.fecha_apertura?.split('T')[0] || "";
     document.getElementById("estado").value            = c.estado;
-    document.getElementById("form-titulo").textContent = `Editar Cuenta — ${c.numeroCuenta}`;
+    document.getElementById("form-titulo").textContent = `Editar Cuenta — ${c.numero_cuenta}`;
     document.getElementById("btn-guardar").textContent = "✓ Guardar Cambios";
     document.getElementById("btn-cancelar").style.display = "inline-block";
     document.querySelector(".card").scrollIntoView({ behavior: "smooth" });
@@ -194,6 +198,10 @@ async function confirmarTransaccion() {
     document.getElementById("msg-transaccion").style.display = "block";
     return;
   }
+  
+  const btnConfirmar = document.getElementById("btn-tx-confirmar");
+  btnConfirmar.disabled = true;
+
   try {
     const res = await fetch(`${API_BASE}/${txCuentaId}/${txTipo}`, {
       method: "POST",
@@ -201,8 +209,9 @@ async function confirmarTransaccion() {
       body: JSON.stringify({ monto, descripcion: descripcion || undefined }),
     });
     const resultado = await res.json();
+    
     if (!res.ok) {
-      document.getElementById("msg-transaccion").textContent = resultado.error || "Error.";
+      document.getElementById("msg-transaccion").textContent = resultado.error || "Error en la transacción.";
       document.getElementById("msg-transaccion").className   = "mensaje error";
       document.getElementById("msg-transaccion").style.display = "block";
       return;
@@ -214,43 +223,48 @@ async function confirmarTransaccion() {
     document.getElementById("msg-transaccion").textContent = "Error de conexión.";
     document.getElementById("msg-transaccion").className   = "mensaje error";
     document.getElementById("msg-transaccion").style.display = "block";
+  } finally {
+    btnConfirmar.disabled = false;
   }
 }
 
-// ─── MODAL HISTORIAL ──────────────────────────────────────────────────────────
+// ─── MODAL HISTORIAL DE MOVIMIENTOS ───────────────────────────────────────────
 
 async function verHistorial(id, numeroCuenta, socioNombre) {
   document.getElementById("hist-cuenta").textContent = numeroCuenta;
   document.getElementById("hist-socio").textContent  = socioNombre;
   document.getElementById("hist-total").textContent  = "";
-  document.getElementById("tbody-historial").innerHTML = '<tr><td colspan="5" class="cargando">Cargando...</td></tr>';
+  document.getElementById("tbody-historial").innerHTML = '<tr><td colspan="5" class="cargando">Cargando movimientos...</td></tr>';
   document.getElementById("modal-historial").style.display = "flex";
   try {
-    const res   = await fetch(`${API_BASE}/${id}/pagos`);
-    const pagos = await res.json();
-    if (pagos.length === 0) {
-      document.getElementById("tbody-historial").innerHTML = '<tr><td colspan="5" class="cargando">Sin transacciones.</td></tr>';
+    const res   = await fetch(`${API_BASE}/${id}/movimientos`);
+    const movimientos = await res.json();
+    
+    if (movimientos.length === 0) {
+      document.getElementById("tbody-historial").innerHTML = '<tr><td colspan="5" class="cargando">Sin movimientos registrados.</td></tr>';
       return;
     }
+    
     let totalDep = 0, totalRet = 0;
-    document.getElementById("tbody-historial").innerHTML = pagos.map(p => {
-      const esDeposito = p.tipo === "deposito";
-      if (esDeposito) totalDep += Number(p.monto); else totalRet += Number(p.monto);
+    document.getElementById("tbody-historial").innerHTML = movimientos.map(m => {
+      const esDeposito = m.tipo === "deposito";
+      if (esDeposito) totalDep += Number(m.monto); else totalRet += Number(m.monto);
       return `
       <tr>
-        <td>${p.id}</td>
-        <td><span class="badge badge-${p.tipo}">${p.tipo === "deposito" ? "Depósito" : "Retiro"}</span></td>
-        <td class="${esDeposito ? "monto-verde" : "monto-rojo"}">${esDeposito ? "+" : "-"}${formatMonto(Number(p.monto))}</td>
-        <td>${formatearFecha(p.fecha)}</td>
-        <td>${p.descripcion ? escHtml(p.descripcion) : '<span style="color:#a0aec0">—</span>'}</td>
+        <td>${m.id_movimiento}</td>
+        <td><span class="badge badge-${m.tipo}">${m.tipo === "deposito" ? "Depósito" : "Retiro"}</span></td>
+        <td class="${esDeposito ? "monto-verde" : "monto-rojo"}">${esDeposito ? "+" : "-"}${formatMonto(Number(m.monto))}</td>
+        <td>${formatearFecha(m.fecha)}</td>
+        <td>${m.referencia ? escHtml(m.referencia) : '<span style="color:#a0aec0">—</span>'}</td>
       </tr>`;
     }).join("");
+    
     document.getElementById("hist-total").innerHTML =
       `<span class="monto-verde">Depósitos: ${formatMonto(totalDep)}</span> &nbsp;|&nbsp; ` +
       `<span class="monto-rojo">Retiros: ${formatMonto(totalRet)}</span> &nbsp;|&nbsp; ` +
-      `<strong>${pagos.length} transacciones</strong>`;
+      `<strong>${movimientos.length} transacciones</strong>`;
   } catch (err) {
-    document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5" class="cargando">Error al cargar.</td></tr>`;
+    document.getElementById("tbody-historial").innerHTML = `<tr><td colspan="5" class="cargando">Error al cargar historial.</td></tr>`;
   }
 }
 
@@ -281,7 +295,7 @@ async function confirmarEliminar() {
   try {
     const res = await fetch(`${API_BASE}/${idParaEliminar}`, { method: "DELETE" });
     const resultado = await res.json();
-    if (!res.ok) { mostrarMensaje(resultado.error || "Error al eliminar.", "error"); return; }
+    if (!res.ok) { mostrarMensaje(resultado.error || "Error al eliminar. Verifique que la cuenta no tenga movimientos.", "error"); return; }
     mostrarMensaje("Cuenta eliminada exitosamente.", "exito");
     await cargarCuentas();
   } catch (err) { mostrarMensaje("Error de conexión: " + err.message, "error"); }
@@ -295,7 +309,7 @@ function limpiarFormulario() {
   document.getElementById("form-titulo").textContent = "Abrir Nueva Cuenta de Ahorro";
   document.getElementById("btn-guardar").textContent = "✓ Abrir Cuenta";
   document.getElementById("btn-cancelar").style.display = "none";
-  document.getElementById("saldo").value = "0";
+  document.getElementById("saldo").value = "0.00";
   const hoy = new Date().toISOString().split("T")[0];
   document.getElementById("fechaApertura").value = hoy;
   document.getElementById("estado").value = "activa";
@@ -319,7 +333,8 @@ function formatMonto(v) {
 }
 function formatearFecha(f) {
   if (!f) return '<span style="color:#a0aec0">—</span>';
-  const [a, m, d] = f.split("-");
+  const fechaLimpia = f.split('T')[0];
+  const [a, m, d] = fechaLimpia.split("-");
   return `${d}/${m}/${a}`;
 }
 function estadoLabel(e) { return { activa:"Activa", inactiva:"Inactiva", cerrada:"Cerrada" }[e] || e; }
