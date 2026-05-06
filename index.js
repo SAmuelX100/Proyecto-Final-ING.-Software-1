@@ -1,75 +1,68 @@
-/**
- * Lógica del Dashboard Principal
- */
-
 document.addEventListener("DOMContentLoaded", () => {
   verificarAcceso();
-  cargarEstadisticas();
-  cargarActividadReciente();
+  cargarDashboard();
 });
-
-// ─── VERIFICAR SESIÓN (Método verificarSesion del diagrama) ───────────────────
 
 function verificarAcceso() {
   const token = localStorage.getItem("coop_token");
-  const user  = localStorage.getItem("coop_user");
-
+  const user  = localStorage.getItem("coop_user") || "Administrador";
   if (!token) {
     window.location.href = "./login.html";
     return;
   }
-
   document.getElementById("user-display").textContent = `Bienvenido, ${user}`;
 }
 
-// ─── CARGAR ESTADÍSTICAS GLOBALES ─────────────────────────────────────────────
-
-async function cargarEstadisticas() {
+async function cargarDashboard() {
   try {
-    // En un entorno real, llamaríamos a una API de resumen global
-    // const res = await fetch("/api/dashboard/stats");
-    // const data = await res.json();
+    const res = await fetch("/api/Dashboard");
+    if (!res.ok) throw new Error("No se pudo conectar con el servidor");
+    
+    const data = await res.json();
 
-    // Simulación de datos para el Dashboard
-    document.getElementById("stat-socios").textContent = "154";
-    document.getElementById("stat-prestamos").textContent = formatMonto(1250000);
-    document.getElementById("stat-ahorros").textContent = formatMonto(850400);
-    document.getElementById("stat-capital").textContent = formatMonto(2100400);
+    // Actualizar Tarjetas de Estadísticas
+    document.getElementById("stat-socios").textContent    = data.stats.socios;
+    document.getElementById("stat-prestamos").textContent = formatMonto(data.stats.prestamos);
+    document.getElementById("stat-ahorros").textContent   = formatMonto(data.stats.ahorros);
+    document.getElementById("stat-capital").textContent   = formatMonto(data.stats.capital);
 
-  } catch (err) { console.error("Error cargando estadísticas:", err); }
+    // Actualizar Lista de Actividad
+    const list = document.getElementById("activity-list");
+    if (!data.actividad.length) {
+      list.innerHTML = `<p class="empty-msg">No hay actividad reciente registrada.</p>`;
+      return;
+    }
+
+    list.innerHTML = data.actividad.map(a => `
+      <div class="activity-item">
+        <span><strong>•</strong> ${a.desc}</span>
+        <span class="activity-time">${tiempoRelativo(a.fecha)}</span>
+      </div>
+    `).join("");
+
+  } catch (err) {
+    console.error("Dashboard Error:", err);
+    document.getElementById("activity-list").innerHTML = `<p class="error-msg">Error al sincronizar datos.</p>`;
+  }
 }
-
-// ─── CARGAR ACTIVIDAD RECIENTE ────────────────────────────────────────────────
-
-function cargarActividadReciente() {
-  const list = document.getElementById("activity-list");
-  
-  // Simulación de logs de actividad
-  const actividades = [
-    { desc: "Nuevo préstamo aprobado para Juan Pérez", hora: "Hace 5 min" },
-    { desc: "Pago de cuota #4 registrado - ID: 4502", hora: "Hace 12 min" },
-    { desc: "Nuevo socio registrado: María García", hora: "Hace 1 hora" },
-    { desc: "Reporte financiero mensual generado", hora: "Hace 3 horas" }
-  ];
-
-  list.innerHTML = actividades.map(a => `
-    <div class="activity-item">
-      <span><strong>•</strong> ${a.desc}</span>
-      <span class="activity-time">${a.hora}</span>
-    </div>
-  `).join("");
-}
-
-// ─── CERRAR SESIÓN (Método logout del diagrama) ───────────────────────────────
 
 function cerrarSesion() {
-  localStorage.removeItem("coop_token");
-  localStorage.removeItem("coop_user");
+  localStorage.clear();
   window.location.href = "./login.html";
 }
 
-// ─── UTILIDADES ───────────────────────────────────────────────────────────────
-
 function formatMonto(v) {
   return "RD$ " + Number(v).toLocaleString("es-DO", { minimumFractionDigits: 2 });
+}
+
+function tiempoRelativo(fechaStr) {
+  if (!fechaStr) return "Ahora";
+  const diff = new Date() - new Date(fechaStr);
+  const min = Math.floor(diff / 60000);
+  const hrs = Math.floor(min / 60);
+  const dias = Math.floor(hrs / 24);
+
+  if (min < 60) return `Hace ${min || 1} min`;
+  if (hrs < 24) return `Hace ${hrs} hora(s)`;
+  return dias === 1 ? "Ayer" : `Hace ${dias} días`;
 }
