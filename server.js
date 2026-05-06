@@ -27,7 +27,6 @@ function toSnakeCase(obj) {
 
 // ─── LÓGICA DE NEGOCIO AVANZADA: REPORTES ─────────────────────────────────────
 
-// 1. Obtener estadísticas (Para las tarjetas de arriba)
 app.get('/api/Reporte/estadisticas', async (req, res) => {
   try {
     const total = await con.query(`SELECT COUNT(*) FROM "Reporte"`);
@@ -42,11 +41,9 @@ app.get('/api/Reporte/estadisticas', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 2. Obtener datos reales del reporte (filtro por fechas) o consultar la tabla Reporte
 app.get('/api/Reporte', async (req, res) => {
   const { tipo, inicio, fin } = req.query;
   
-  // Si no hay query 'tipo', actúa como CRUD genérico (devuelve el historial de reportes)
   if (!tipo) {
     try {
       const result = await con.query(`SELECT * FROM "Reporte" ORDER BY fecha_generacion DESC`);
@@ -54,25 +51,64 @@ app.get('/api/Reporte', async (req, res) => {
     } catch (e) { return res.status(500).json({ error: e.message }); }
   }
 
-  // Si hay query 'tipo', consultamos la tabla correspondiente para llenar la vista previa
   try {
     let result = { rows: [] };
+    
     if (tipo === 'socios') {
-      result = await con.query(`SELECT id_socio, nombre || ' ' || apellido AS nombre_completo, dni, email, fecha_ingreso, estado FROM "Socio" WHERE fecha_ingreso BETWEEN $1 AND $2`, [inicio, fin]);
+      result = await con.query(`
+        SELECT id_socio, nombre || ' ' || apellido AS nombre_completo, dni, email, fecha_ingreso, estado 
+        FROM "Socio" 
+        WHERE fecha_ingreso::date BETWEEN $1 AND $2
+      `, [inicio, fin]);
     } else if (tipo === 'prestamos') {
-      result = await con.query(`SELECT id_prestamo, id_socio, monto, plazo_meses, tasa_interes, estado, monto AS saldo_pendiente FROM "Prestamo" WHERE fecha_solicitud BETWEEN $1 AND $2`, [inicio, fin]);
+      result = await con.query(`
+        SELECT id_prestamo, id_socio, monto, plazo_meses, tasa_interes, estado, monto AS saldo_pendiente 
+        FROM "Prestamo" 
+        WHERE fecha_solicitud::date BETWEEN $1 AND $2
+      `, [inicio, fin]);
     } else if (tipo === 'aportaciones') {
-      result = await con.query(`SELECT id_aportacion, id_socio, monto, fecha, tipo, estado FROM "Aportacion" WHERE fecha BETWEEN $1 AND $2`, [inicio, fin]);
+      result = await con.query(`
+        SELECT id_aportacion, id_socio, monto, fecha, tipo, estado 
+        FROM "Aportacion" 
+        WHERE fecha::date BETWEEN $1 AND $2
+      `, [inicio, fin]);
+    } else if (tipo === 'financiero') {
+      // Lógica de Reporte Financiero (Estado de Resultados Básico)
+      const aportaciones = await con.query(`SELECT COALESCE(SUM(monto), 0) as total FROM "Aportacion" WHERE fecha::date BETWEEN $1 AND $2`, [inicio, fin]);
+      const pagos = await con.query(`SELECT COALESCE(SUM(monto_pagado), 0) as total FROM "Pago" WHERE fecha_pago::date BETWEEN $1 AND $2`, [inicio, fin]);
+const prestamos = await con.query(`SELECT COALESCE(SUM(monto), 0) as total FROM "Prestamo" WHERE estado::text IN ('aprobado', 'desembolsado', 'activo') AND fecha_solicitud::date BETWEEN $1 AND $2`, [inicio, fin]);      const depositos = await con.query(`SELECT COALESCE(SUM(monto), 0) as total FROM "Movimiento_ahorro" WHERE tipo = 'deposito' AND fecha::date BETWEEN $1 AND $2`, [inicio, fin]);
+      const retiros = await con.query(`SELECT COALESCE(SUM(monto), 0) as total FROM "Movimiento_ahorro" WHERE tipo = 'retiro' AND fecha::date BETWEEN $1 AND $2`, [inicio, fin]);
+
+      const totApo = parseFloat(aportaciones.rows[0].total);
+      const totPag = parseFloat(pagos.rows[0].total);
+      const totPre = parseFloat(prestamos.rows[0].total);
+      const totDep = parseFloat(depositos.rows[0].total);
+      const totRet = parseFloat(retiros.rows[0].total);
+
+      result.rows = [
+        { Concepto: "Aportaciones (Capital Social)", Ingresos: totApo, Egresos: 0, Balance: totApo },
+        { Concepto: "Pagos Recibidos (Préstamos)", Ingresos: totPag, Egresos: 0, Balance: totPag },
+        { Concepto: "Depósitos de Ahorro", Ingresos: totDep, Egresos: 0, Balance: totDep },
+        { Concepto: "Préstamos Desembolsados", Ingresos: 0, Egresos: totPre, Balance: -totPre },
+        { Concepto: "Retiros de Ahorro", Ingresos: 0, Egresos: totRet, Balance: -totRet },
+        { Concepto: "TOTAL BALANCE GENERAL", 
+          Ingresos: (totApo + totPag + totDep), 
+          Egresos: (totPre + totRet), 
+          Balance: ((totApo + totPag + totDep) - (totPre + totRet)) 
+        }
+      ];
     }
+    
     res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { 
+    console.error("Error en reporte:", e.message);
+    res.status(500).json({ error: e.message }); 
+  }
 });
 
-// 3. Registrar un nuevo Reporte en BD
 app.post('/api/Reporte', async (req, res) => {
   const { tipo, fechaInicio, fechaFin, formato, generadoPor } = req.body;
   try {
-    // Inserta y devuelve el ID generado por la secuencia
     const result = await con.query(
       `INSERT INTO "Reporte" (tipo, fecha_inicio, fecha_fin, formato, generado_por, fecha_generacion) 
        VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
@@ -84,7 +120,6 @@ app.post('/api/Reporte', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
 
 // ─── LÓGICA DE NEGOCIO AVANZADA: AHORROS ──────────────────────────────────────
 app.get('/api/Cuenta_ahorro/:id/movimientos', async (req, res) => {
@@ -137,7 +172,6 @@ app.post('/api/Cuenta_ahorro/:id/retiro', async (req, res) => {
     res.json({ ok: true, saldo: saldoPosterior });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-
 
 // ─── LÓGICA DE NEGOCIO AVANZADA: PRÉSTAMOS Y PAGOS ────────────────────────────
 app.get('/api/Prestamo/:id/evaluar', async (req, res) => {

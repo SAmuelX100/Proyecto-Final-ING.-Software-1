@@ -38,13 +38,21 @@ async function cargarSociosSelect() {
 async function cargarAportaciones() {
   try {
     const res = await fetch(API_BASE);
+    
+    // 🛡️ FIX: Validar que el servidor responda JSON y no una página HTML de error
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Respuesta no válida del servidor. Verifica la conexión.");
+    }
+
     if (!res.ok) throw new Error("Error al cargar aportaciones");
+    
     aportacionesList = await res.json();
     actualizarResumen(aportacionesList);
     renderTabla(aportacionesList);
     document.getElementById("resumen-grid").style.display = "grid";
   } catch (err) {
-    mostrarMensaje("Error al conectar con el servidor: " + err.message, "error");
+    mostrarMensaje("Error: " + err.message, "error");
     document.getElementById("tbody-aportaciones").innerHTML =
       '<tr><td colspan="7" class="cargando">No se pudieron cargar los datos.</td></tr>';
   }
@@ -128,7 +136,7 @@ async function guardarAportacion(e) {
     const ap = id ? aportacionesList.find(x => x.id_aportacion == id) : null;
     datos.validadoPor = (ap && ap.validado_por) 
         ? ap.validado_por 
-        : Number(localStorage.getItem("user_id"));
+        : (Number(localStorage.getItem("user_id")) || 1);
   } else {
     datos.validadoPor = null;
   }
@@ -148,8 +156,14 @@ async function guardarAportacion(e) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(datos),
     });
+    
+    // 🛡️ FIX: Validar JSON antes de procesar
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) throw new Error("Respuesta inválida del servidor");
+
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al guardar.", "error"); return; }
+    
     mostrarMensaje(id ? "Aportación actualizada exitosamente." : `Aportación registrada (ID: ${resultado.id_aportacion}).`, "exito");
     limpiarFormulario();
     await cargarAportaciones();
@@ -179,22 +193,34 @@ function editarAportacion(id) {
   } catch (err) { mostrarMensaje("No se pudo cargar: " + err.message, "error"); }
 }
 
-// ─── VALIDAR RÁPIDO (Y PAGAR CUOTA SI APLICA) ─────────────────────────────────
+// ─── VALIDAR RÁPIDO ───────────────────────────────────────────────────────────
 
 async function validarAportacion(id) {
   try {
-    const body = { validado_por: Number(localStorage.getItem("user_id")) };
-    
-    const res = await fetch(`${API_BASE}/${id}/validar`, { 
+    const a = aportacionesList.find(x => x.id_aportacion === id);
+    if (!a) return;
+
+    // 🛡️ FIX: Usamos la ruta genérica PUT porque el endpoint /validar no existe
+    const res = await fetch(`${API_BASE}/${id}`, { 
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        idSocio: a.id_socio,
+        monto: a.monto,
+        fecha: a.fecha.split('T')[0], 
+        tipo: a.tipo,
+        estado: "validada",
+        validadoPor: Number(localStorage.getItem("user_id")) || 1
+      })
     });
     
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) throw new Error("Respuesta inválida del servidor");
+
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al validar.", "error"); return; }
     
-    mostrarMensaje("Aportación validada. Si era un abono, la cuota se descontó automáticamente.", "exito");
+    mostrarMensaje("Aportación validada con éxito.", "exito");
     await cargarAportaciones();
   } catch (err) { 
     mostrarMensaje("Error de conexión: " + err.message, "error"); 
@@ -223,6 +249,10 @@ async function confirmarEliminar() {
   
   try {
     const res = await fetch(`${API_BASE}/${idParaEliminar}`, { method: "DELETE" });
+    
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) throw new Error("Respuesta inválida del servidor");
+
     const resultado = await res.json();
     if (!res.ok) { mostrarMensaje(resultado.error || "Error al eliminar.", "error"); return; }
     mostrarMensaje("Aportación eliminada exitosamente.", "exito");
@@ -268,10 +298,10 @@ function formatearFecha(f) {
 function tipoLabel(t) { 
   return { 
     ordinaria: "Ordinaria", 
-    cuota_mensual: "Cuota Mensual (Ordinaria)", 
+    cuota_mensual: "Cuota Mensual", 
     extraordinaria: "Extraordinaria", 
-    ahorro: "Ahorro (Extraordinaria)", 
-    abono_prestamo: "Abono a Préstamo (Extraordinaria)" 
+    ahorro: "Ahorro", 
+    abono_prestamo: "Abono a Préstamo" 
   }[t] || t; 
 }
 function estadoLabel(e) { return { pendiente:"Pendiente", validada:"Validada", rechazada:"Rechazada" }[e] || e; }
